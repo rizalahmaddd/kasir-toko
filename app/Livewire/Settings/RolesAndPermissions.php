@@ -1,0 +1,590 @@
+<?php
+
+namespace App\Livewire\Settings;
+
+use App\Models\User;
+use App\Policies\RolePolicy;
+use Database\Seeders\PermissionSeeder;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
+use Livewire\Attributes\Layout;
+use Livewire\Attributes\Title;
+use Livewire\Attributes\Url;
+use Livewire\Component;
+use Livewire\WithPagination;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
+
+#[Layout('layouts.app', ['heading' => 'Pengaturan Peran & Perizinan'])]
+#[Title('Pengaturan Peran & Perizinan')]
+class RolesAndPermissions extends Component
+{
+    use WithPagination;
+
+    public const TABS = ['roles', 'matrix', 'users'];
+
+    #[Url(as: 'tab', except: 'roles')]
+    public string $tab = 'roles';
+
+    #[Url(as: 'peran', except: '')]
+    public string $selectedRoleName = 'superadmin';
+
+    public array $rolePermissions = [];
+
+    public string $permissionSearch = '';
+
+    public string $roleSearch = '';
+
+    public string $matrixSearch = '';
+
+    public string $matrixModule = '';
+
+    #[Url(as: 'cari', except: '')]
+    public string $userSearch = '';
+
+    public string $userRoleFilter = '';
+
+    // Modals
+    public bool $showCreateRoleModal = false;
+
+    public string $newRoleName = '';
+
+    public bool $showEditRoleModal = false;
+
+    public ?int $editingRoleId = null;
+
+    public string $editingRoleName = '';
+
+    public bool $showDeleteRoleModal = false;
+
+    public ?int $roleToDeleteId = null;
+
+    public bool $showUserRolesModal = false;
+
+    public ?int $editingUserId = null;
+
+    public array $editingUserRoles = [];
+
+    public function mount(): void
+    {
+        abort_unless(Auth::user()->can('viewAny', Role::class), 403);
+
+        if (! in_array($this->tab, self::TABS, true)) {
+            $this->tab = 'roles';
+        }
+
+        $roles = Role::orderByRaw("CASE WHEN LOWER(name) = 'superadmin' THEN 0 ELSE 1 END")
+            ->orderBy('id')
+            ->pluck('name')
+            ->all();
+
+        if (! in_array($this->selectedRoleName, $roles, true)) {
+            $this->selectedRoleName = $roles[0] ?? 'superadmin';
+        }
+
+        $this->loadSelectedRolePermissions();
+    }
+
+    public function updatedTab(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedUserSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedUserRoleFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function selectRole(string $roleName): void
+    {
+        $this->selectedRoleName = $roleName;
+        $this->loadSelectedRolePermissions();
+    }
+
+    public function loadSelectedRolePermissions(): void
+    {
+        $role = Role::where('name', $this->selectedRoleName)->first();
+
+        if ($role) {
+            $this->rolePermissions = $role->permissions()->pluck('name')->all();
+        } else {
+            $this->rolePermissions = [];
+        }
+    }
+
+    public function toggleRolePermission(string $permissionName): void
+    {
+        abort_unless(Auth::user()->can('managePermissions', Role::class), 403);
+
+        $role = Role::where('name', $this->selectedRoleName)->firstOrFail();
+        $permissionsBefore = $this->permissionNamesOf($role);
+
+        if (in_array($permissionName, $this->rolePermissions, true)) {
+            $this->rolePermissions = array_values(array_diff($this->rolePermissions, [$permissionName]));
+            $role->revokePermissionTo($permissionName);
+            $action = 'dicabut dari';
+        } else {
+            $this->rolePermissions[] = $permissionName;
+            $role->givePermissionTo($permissionName);
+            $action = 'diberikan kepada';
+        }
+
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
+
+        $this->logPermissionChange($role, $permissionsBefore, "Hak akses [{$permissionName}] {$action} peran '{$role->name}'.");
+
+        $this->dispatch('notify', message: "Hak akses [{$permissionName}] berhasil diperbarui.");
+    }
+
+    public function selectAllInModule(string $module): void
+    {
+        abort_unless(Auth::user()->can('managePermissions', Role::class), 403);
+
+        $role = Role::where('name', $this->selectedRoleName)->firstOrFail();
+        $permissionsBefore = $this->permissionNamesOf($role);
+        $modulePermissions = array_keys(PermissionSeeder::PERMISSION_GROUPS[$module] ?? []);
+
+        $newPermissions = array_values(array_unique(array_merge($this->rolePermissions, $modulePermissions)));
+        $role->syncPermissions($newPermissions);
+        $this->rolePermissions = $newPermissions;
+
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
+
+        $this->logPermissionChange($role, $permissionsBefore, "Semua hak akses modul '{$module}' diberikan kepada peran '{$role->name}'.");
+
+        $this->dispatch('notify', message: "Semua hak akses modul {$module} diaktifkan.");
+    }
+
+    public function clearAllInModule(string $module): void
+    {
+        abort_unless(Auth::user()->can('managePermissions', Role::class), 403);
+
+        $role = Role::where('name', $this->selectedRoleName)->firstOrFail();
+        $permissionsBefore = $this->permissionNamesOf($role);
+        $modulePermissions = array_keys(PermissionSeeder::PERMISSION_GROUPS[$module] ?? []);
+
+        $newPermissions = array_values(array_diff($this->rolePermissions, $modulePermissions));
+        $role->syncPermissions($newPermissions);
+        $this->rolePermissions = $newPermissions;
+
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
+
+        $this->logPermissionChange($role, $permissionsBefore, "Semua hak akses modul '{$module}' dicabut dari peran '{$role->name}'.");
+
+        $this->dispatch('notify', message: "Semua hak akses modul {$module} dinonaktifkan.");
+    }
+
+    public function selectAllPermissions(): void
+    {
+        abort_unless(Auth::user()->can('managePermissions', Role::class), 403);
+
+        $role = Role::where('name', $this->selectedRoleName)->firstOrFail();
+        $permissionsBefore = $this->permissionNamesOf($role);
+        $allPermissions = Permission::pluck('name')->all();
+
+        $role->syncPermissions($allPermissions);
+        $this->rolePermissions = $allPermissions;
+
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
+
+        $this->logPermissionChange($role, $permissionsBefore, "Seluruh hak akses sistem diberikan kepada peran '{$role->name}'.");
+
+        $this->dispatch('notify', message: 'Semua hak akses sistem berhasil diaktifkan.');
+    }
+
+    public function clearAllPermissions(): void
+    {
+        abort_unless(Auth::user()->can('managePermissions', Role::class), 403);
+
+        $role = Role::where('name', $this->selectedRoleName)->firstOrFail();
+        $permissionsBefore = $this->permissionNamesOf($role);
+
+        $role->syncPermissions([]);
+        $this->rolePermissions = [];
+
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
+
+        $this->logPermissionChange($role, $permissionsBefore, "Seluruh hak akses dicabut dari peran '{$role->name}'.");
+
+        $this->dispatch('notify', message: 'Semua hak akses peran berhasil dikosongkan.');
+    }
+
+    public function resetRoleToDefault(): void
+    {
+        abort_unless(Auth::user()->can('managePermissions', Role::class), 403);
+
+        $role = Role::where('name', $this->selectedRoleName)->firstOrFail();
+        $permissionsBefore = $this->permissionNamesOf($role);
+
+        if (! isset(PermissionSeeder::DEFAULT_ROLE_PERMISSIONS[$role->name])) {
+            $this->dispatch('notify', message: 'Peran kustom tidak memiliki perizinan bawaan (default).', type: 'error');
+
+            return;
+        }
+
+        $default = PermissionSeeder::DEFAULT_ROLE_PERMISSIONS[$role->name];
+        if ($default === ['*']) {
+            $default = Permission::pluck('name')->all();
+        }
+
+        $role->syncPermissions($default);
+        $this->rolePermissions = $default;
+
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
+
+        $this->logPermissionChange($role, $permissionsBefore, "Hak akses peran '{$role->name}' dikembalikan ke setelan bawaan.");
+
+        $this->dispatch('notify', message: "Hak akses peran '{$role->name}' dikembalikan ke bawaan.");
+    }
+
+    public function toggleMatrixPermission(int $roleId, string $permissionName): void
+    {
+        abort_unless(Auth::user()->can('managePermissions', Role::class), 403);
+
+        $role = Role::findOrFail($roleId);
+        $permissionsBefore = $this->permissionNamesOf($role);
+
+        if ($role->hasPermissionTo($permissionName)) {
+            $role->revokePermissionTo($permissionName);
+            $action = 'dicabut dari';
+        } else {
+            $role->givePermissionTo($permissionName);
+            $action = 'diberikan kepada';
+        }
+
+        if ($role->name === $this->selectedRoleName) {
+            $this->loadSelectedRolePermissions();
+        }
+
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
+
+        $this->logPermissionChange($role, $permissionsBefore, "Matriks: Hak akses [{$permissionName}] {$action} peran '{$role->name}'.");
+
+        $this->dispatch('notify', message: "Matriks perizinan untuk peran '{$role->name}' diperbarui.");
+    }
+
+    // Role CRUD Operations
+    public function openCreateRoleModal(): void
+    {
+        abort_unless(Auth::user()->can('create', Role::class), 403);
+        $this->newRoleName = '';
+        $this->resetErrorBag();
+        $this->showCreateRoleModal = true;
+        $this->dispatch('open-modal', 'create-role');
+    }
+
+    public function createRole(): void
+    {
+        abort_unless(Auth::user()->can('create', Role::class), 403);
+
+        $this->newRoleName = strtolower(trim($this->newRoleName));
+
+        $this->validate([
+            'newRoleName' => [
+                'required',
+                'string',
+                'min:3',
+                'max:40',
+                'regex:/^[a-z0-9 ]+$/',
+                Rule::unique('roles', 'name'),
+            ],
+        ], [
+            'newRoleName.required' => 'Nama peran wajib diisi.',
+            'newRoleName.min' => 'Nama peran minimal 3 karakter.',
+            'newRoleName.max' => 'Nama peran maksimal 40 karakter.',
+            'newRoleName.regex' => 'Nama peran hanya boleh berisi huruf kecil, angka, dan spasi.',
+            'newRoleName.unique' => 'Nama peran ini sudah digunakan.',
+        ]);
+
+        $role = Role::create([
+            'name' => $this->newRoleName,
+            'guard_name' => 'web',
+        ]);
+
+        activity('roles')
+            ->causedBy(Auth::user())
+            ->performedOn($role)
+            ->event('created')
+            ->withChanges(['attributes' => ['name' => $role->name, 'guard_name' => $role->guard_name]])
+            ->log("Peran baru '{$role->name}' berhasil dibuat.");
+
+        $this->showCreateRoleModal = false;
+
+        $this->dispatch('close-modal', 'create-role');
+        $this->selectedRoleName = $role->name;
+        $this->loadSelectedRolePermissions();
+
+        $this->dispatch('notify', message: "Peran '{$role->name}' berhasil ditambahkan.");
+    }
+
+    public function openEditRoleModal(int $roleId): void
+    {
+        $role = Role::findOrFail($roleId);
+        abort_unless(Auth::user()->can('update', $role), 403);
+
+        if (in_array(strtolower($role->name), RolePolicy::PROTECTED_ROLES, true)) {
+            $this->dispatch('notify', message: 'Peran sistem tidak dapat diubah namanya.', type: 'error');
+
+            return;
+        }
+
+        $this->editingRoleId = $role->id;
+        $this->editingRoleName = $role->name;
+        $this->resetErrorBag();
+        $this->showEditRoleModal = true;
+        $this->dispatch('open-modal', 'edit-role');
+    }
+
+    public function updateRole(): void
+    {
+        $role = Role::findOrFail($this->editingRoleId);
+        abort_unless(Auth::user()->can('update', $role), 403);
+
+        if (in_array(strtolower($role->name), RolePolicy::PROTECTED_ROLES, true)) {
+            $this->dispatch('notify', message: 'Peran sistem tidak dapat diubah namanya.', type: 'error');
+
+            return;
+        }
+
+        $this->editingRoleName = strtolower(trim($this->editingRoleName));
+
+        $this->validate([
+            'editingRoleName' => [
+                'required',
+                'string',
+                'min:3',
+                'max:40',
+                'regex:/^[a-z0-9 ]+$/',
+                Rule::unique('roles', 'name')->ignore($role->id),
+            ],
+        ]);
+
+        $oldName = $role->name;
+        $role->name = $this->editingRoleName;
+        $role->save();
+
+        if ($this->selectedRoleName === $oldName) {
+            $this->selectedRoleName = $role->name;
+        }
+
+        activity('roles')
+            ->causedBy(Auth::user())
+            ->performedOn($role)
+            ->event('updated')
+            ->withChanges(['old' => ['name' => $oldName], 'attributes' => ['name' => $role->name]])
+            ->log("Nama peran '{$oldName}' diubah menjadi '{$role->name}'.");
+
+        $this->showEditRoleModal = false;
+
+        $this->dispatch('close-modal', 'edit-role');
+        $this->dispatch('notify', message: "Nama peran berhasil diperbarui menjadi '{$role->name}'.");
+    }
+
+    public function confirmDeleteRole(int $roleId): void
+    {
+        $role = Role::findOrFail($roleId);
+        abort_unless(Auth::user()->can('delete', $role), 403);
+
+        if (in_array(strtolower($role->name), RolePolicy::PROTECTED_ROLES, true)) {
+            $this->dispatch('notify', message: 'Peran sistem dilindungi dan tidak dapat dihapus demi keamanan operasional.', type: 'error');
+
+            return;
+        }
+
+        if ($role->users()->count() > 0) {
+            $count = $role->users()->count();
+            $this->dispatch('notify', message: "Peran ini masih ditugaskan kepada {$count} pengguna. Pindahkan peran pengguna terlebih dahulu.", type: 'error');
+
+            return;
+        }
+
+        $this->roleToDeleteId = $role->id;
+        $this->showDeleteRoleModal = true;
+        $this->dispatch('open-modal', 'delete-role');
+    }
+
+    public function deleteRole(): void
+    {
+        $role = Role::findOrFail($this->roleToDeleteId);
+        abort_unless(Auth::user()->can('delete', $role), 403);
+
+        if (in_array(strtolower($role->name), RolePolicy::PROTECTED_ROLES, true)) {
+            $this->dispatch('notify', message: 'Peran sistem dilindungi dan tidak dapat dihapus.', type: 'error');
+
+            return;
+        }
+
+        if ($role->users()->count() > 0) {
+            $this->dispatch('notify', message: 'Peran masih memiliki pengguna aktif.', type: 'error');
+
+            return;
+        }
+
+        $roleName = $role->name;
+        $snapshot = [
+            'id' => $role->id,
+            'name' => $role->name,
+            'guard_name' => $role->guard_name,
+            'permissions' => $this->permissionNamesOf($role),
+        ];
+        $role->delete();
+
+        activity('roles')
+            ->causedBy(Auth::user())
+            ->event('deleted')
+            ->withChanges(['old' => $snapshot])
+            ->log("Peran '{$roleName}' telah dihapus dari sistem.");
+
+        $this->showDeleteRoleModal = false;
+
+        $this->dispatch('close-modal', 'delete-role');
+        $this->roleToDeleteId = null;
+
+        if ($this->selectedRoleName === $roleName) {
+            $this->selectedRoleName = 'superadmin';
+            $this->loadSelectedRolePermissions();
+        }
+
+        $this->dispatch('notify', message: "Peran '{$roleName}' berhasil dihapus.");
+    }
+
+    // User Role Assignment
+    public function openUserRolesModal(int $userId): void
+    {
+        abort_unless(Auth::user()->can('manageUserRoles', Role::class), 403);
+
+        $user = User::findOrFail($userId);
+        $this->editingUserId = $user->id;
+        $this->editingUserRoles = $user->roles()->pluck('name')->all();
+        $this->showUserRolesModal = true;
+        $this->dispatch('open-modal', 'user-roles');
+    }
+
+    public function saveUserRoles(): void
+    {
+        abort_unless(Auth::user()->can('manageUserRoles', Role::class), 403);
+
+        $user = User::findOrFail($this->editingUserId);
+
+        // Security safeguard: Pastikan tidak menghapus akun superadmin terakhir
+        if ($user->hasRole('superadmin') && ! in_array('superadmin', $this->editingUserRoles, true)) {
+            $superadminCount = User::role('superadmin')->count();
+            if ($superadminCount <= 1) {
+                $this->dispatch('notify', message: 'Tidak dapat mencabut peran Superadmin terakhir demi keamanan sistem.', type: 'error');
+
+                return;
+            }
+        }
+
+        $rolesBefore = $user->roles()->pluck('name')->sort()->values()->all();
+        $user->syncRoles($this->editingUserRoles);
+
+        activity('roles')
+            ->causedBy(Auth::user())
+            ->performedOn($user)
+            ->event('updated')
+            ->withChanges([
+                'old' => ['roles' => $rolesBefore],
+                'attributes' => ['roles' => $user->roles()->pluck('name')->sort()->values()->all()],
+            ])
+            ->log("Peran pengguna '{$user->name}' diperbarui: ".implode(', ', $this->editingUserRoles));
+
+        $this->showUserRolesModal = false;
+
+        $this->dispatch('close-modal', 'user-roles');
+        $this->dispatch('notify', message: "Penugasan peran untuk {$user->name} berhasil disimpan.");
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function permissionNamesOf(Role $role): array
+    {
+        return $role->permissions()->pluck('name')->sort()->values()->all();
+    }
+
+    /**
+     * @param  list<string>  $before
+     */
+    private function logPermissionChange(Role $role, array $before, string $description): void
+    {
+        $after = $this->permissionNamesOf($role);
+
+        activity('roles')
+            ->causedBy(Auth::user())
+            ->performedOn($role)
+            ->event('updated')
+            ->withChanges(['old' => ['permissions' => $before], 'attributes' => ['permissions' => $after]])
+            ->withProperties([
+                'granted' => array_values(array_diff($after, $before)),
+                'revoked' => array_values(array_diff($before, $after)),
+            ])
+            ->log($description);
+    }
+
+    public function isProtectedRole(string $roleName): bool
+    {
+        return in_array(strtolower($roleName), RolePolicy::PROTECTED_ROLES, true);
+    }
+
+    public function render()
+    {
+        $allRoles = Role::withCount(['users', 'permissions'])
+            ->when($this->roleSearch, fn (Builder $q) => $q->where('name', 'like', "%{$this->roleSearch}%"))
+            ->orderByRaw("CASE WHEN LOWER(name) = 'superadmin' THEN 0 ELSE 1 END")
+            ->orderBy('id')
+            ->get();
+
+        $selectedRole = Role::with('users')->where('name', $this->selectedRoleName)->first();
+
+        $permissionGroups = PermissionSeeder::PERMISSION_GROUPS;
+
+        if ($this->permissionSearch) {
+            $search = mb_strtolower($this->permissionSearch);
+            $filteredGroups = [];
+            foreach ($permissionGroups as $module => $perms) {
+                $matched = array_filter($perms, fn ($meta, $key) => str_contains(mb_strtolower($key), $search)
+                    || str_contains(mb_strtolower($meta['label']), $search)
+                    || str_contains(mb_strtolower($meta['description']), $search), ARRAY_FILTER_USE_BOTH);
+
+                if (! empty($matched)) {
+                    $filteredGroups[$module] = $matched;
+                }
+            }
+            $permissionGroups = $filteredGroups;
+        }
+
+        $users = User::with('roles')
+            ->when($this->userSearch, function (Builder $q) {
+                $s = mb_strtolower($this->userSearch);
+                $q->where(fn (Builder $sq) => $sq->where('name', 'like', "%{$s}%")
+                    ->orWhere('username', 'like', "%{$s}%")
+                    ->orWhere('email', 'like', "%{$s}%"));
+            })
+            ->when($this->userRoleFilter, function (Builder $q) {
+                $q->whereHas('roles', fn (Builder $rq) => $rq->where('name', $this->userRoleFilter));
+            })
+            ->orderBy('name')
+            ->paginate(12);
+
+        $editingUser = $this->editingUserId ? User::find($this->editingUserId) : null;
+
+        return view('livewire.settings.roles-and-permissions', [
+            'allRoles' => $allRoles,
+            'selectedRole' => $selectedRole,
+            'permissionGroups' => $permissionGroups,
+            'allPermissionsList' => Permission::all(),
+            'users' => $users,
+            'editingUser' => $editingUser,
+            'totalPermissionsCount' => Permission::count(),
+            'totalUsersCount' => User::count(),
+        ]);
+    }
+}

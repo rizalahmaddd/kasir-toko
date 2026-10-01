@@ -1,0 +1,841 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+[x-cloak] {
+    display: none !important;
+}
+
+
+/* Design tokens for dark and light mode */
+:root, html.dark {
+    --color-slate-950: 2 6 23;
+    --color-slate-900: 15 23 42;
+    --color-slate-800: 30 41 59;
+    --color-slate-700: 51 65 85;
+    --color-slate-600: 71 85 105;
+    --color-slate-500: 100 116 139;
+    --color-slate-400: 148 163 184;
+    --color-slate-300: 203 213 225;
+    --color-slate-200: 226 232 240;
+    --color-slate-100: 241 245 249;
+    --color-slate-50: 248 250 252;
+    color-scheme: dark;
+}
+
+html.light {
+    --color-slate-950: 248 250 252; /* Body bg: slate-50 */
+    --color-slate-900: 255 255 255; /* Cards, header, sidebar: White */
+    --color-slate-800: 241 245 249; /* Secondary surface / badge bg: slate-100 */
+    --color-slate-700: 226 232 240; /* Secondary border / hover: slate-200 */
+    --color-slate-600: 203 213 225; /* slate-300 */
+    --color-slate-500: 148 163 184; /* Disabled / muted icon: slate-400 */
+    --color-slate-400: 100 116 139; /* Muted text: slate-500 */
+    --color-slate-300: 71 85 105;   /* Secondary body text: slate-600 */
+    --color-slate-200: 30 41 59;    /* Regular dark text: slate-800 */
+    --color-slate-100: 15 23 42;    /* Primary dark headings: slate-900 */
+    --color-slate-50: 2 6 23;       /* Deepest text: slate-950 */
+    color-scheme: light;
+}
+
+/* Universal sleek dropdown select styling */
+select {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    background-repeat: no-repeat !important;
+    background-position: right 0.75rem center !important;
+    background-size: 14px 14px !important;
+    padding-right: 2.25rem !important;
+    cursor: pointer;
+}
+
+/* Dark mode chevron arrow (crisp slate-400) */
+select,
+html.dark select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+}
+
+/* Light mode chevron arrow (crisp slate-500) */
+html.light select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+}
+
+/* Proper background and text for select option lists across platforms */
+select option {
+    background-color: #0f172a;
+    color: #f1f5f9;
+}
+html.light select option {
+    background-color: #ffffff;
+    color: #0f172a;
+}
+
+/* Light mode background and text overrides */
+html.light body {
+    background-color: #f8fafc;
+    color: #0f172a;
+}
+
+/* Form inputs on light mode */
+html.light input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not(.input-bare),
+html.light select,
+html.light .select-trigger,
+html.light textarea {
+    background-color: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    color: #0f172a !important;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+html.light input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not(.input-bare):hover,
+html.light select:hover,
+html.light .select-trigger:hover,
+html.light textarea:hover {
+    border-color: #94a3b8 !important;
+}
+
+html.light input:not(.input-bare):focus,
+html.light select:focus,
+html.light .select-trigger:focus,
+html.light textarea:focus {
+    border-color: #059669 !important;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.16) !important;
+}
+
+/* Modern autofill reset for light and dark modes */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+    -webkit-text-fill-color: #0f172a !important;
+    transition: background-color 5000s ease-in-out 0s;
+}
+
+html.dark input:-webkit-autofill,
+html.dark input:-webkit-autofill:hover, 
+html.dark input:-webkit-autofill:focus,
+html.dark input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px #0f172a inset !important;
+    -webkit-text-fill-color: #f1f5f9 !important;
+}
+
+/* Card and container borders on light mode */
+html.light .border-slate-800 {
+    border-color: #e2e8f0 !important;
+}
+html.light .border-slate-800\/80 {
+    border-color: rgba(226, 232, 240, 0.9) !important;
+}
+html.light .border-slate-800\/60 {
+    border-color: rgba(226, 232, 240, 0.7) !important;
+}
+html.light .border-slate-700 {
+    border-color: #cbd5e1 !important;
+}
+html.light .border-slate-700\/50,
+html.light .border-slate-700\/60 {
+    border-color: rgba(203, 213, 225, 0.6) !important;
+}
+html.light .divide-slate-800\/60 > :not([hidden]) ~ :not([hidden]) {
+    border-color: rgba(226, 232, 240, 0.8) !important;
+}
+
+/* Light mode text clarity overrides */
+html.light .text-slate-900 {
+    color: #0f172a !important;
+}
+html.light .text-slate-800 {
+    color: #1e293b !important;
+}
+html.light .text-slate-700 {
+    color: #334155 !important;
+}
+html.light .text-slate-600 {
+    color: #475569 !important;
+}
+html.light .text-slate-500 {
+    color: #64748b !important;
+}
+
+/* Light mode surface clarity overrides */
+html.light .bg-slate-100 {
+    background-color: #f1f5f9 !important;
+}
+html.light .bg-slate-50 {
+    background-color: #f8fafc !important;
+}
+html.light .border-slate-200 {
+    border-color: #e2e8f0 !important;
+}
+html.light .border-slate-300 {
+    border-color: #cbd5e1 !important;
+}
+
+/* Light mode card shadows */
+html.light .bg-slate-900,
+html.light .bg-slate-900\/80,
+html.light .bg-slate-900\/95 {
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+}
+
+/* Text-white headings/metrics become dark in light mode, preserving buttons and status badges */
+html.light .text-white:not(
+    button,
+    button *,
+    [class*="bg-emerald-"],
+    [class*="bg-emerald-"] *,
+    [class*="bg-rose-"],
+    [class*="bg-rose-"] *,
+    [class*="bg-amber-"],
+    [class*="bg-amber-"] *,
+    [class*="bg-sky-"],
+    [class*="bg-sky-"] *,
+    .badge-solid,
+    .no-dark-invert,
+    .auth-hero-panel,
+    .auth-hero-panel *,
+    .paper-sheet *,
+    .doc-title-badge
+) {
+    color: #0f172a !important;
+}
+
+/* Modal and mobile backdrops should always remain dark dimming overlays */
+html.light .fixed.inset-0.bg-slate-950\/85,
+html.light .fixed.inset-0.bg-slate-950\/80 {
+    background-color: rgba(15, 23, 42, 0.7) !important;
+}
+
+/* Status badges & colored text contrast enhancement in light mode */
+html.light .text-emerald-300 {
+    color: #047857 !important; /* emerald-700 */
+}
+html.light .text-emerald-400 {
+    color: #059669 !important; /* emerald-600 */
+}
+html.light .text-rose-200,
+html.light .text-rose-300 {
+    color: #be123c !important; /* rose-700 */
+}
+html.light .text-rose-400 {
+    color: #e11d48 !important; /* rose-600 */
+}
+html.light .text-amber-300 {
+    color: #b45309 !important; /* amber-700 */
+}
+html.light .text-amber-400 {
+    color: #d97706 !important; /* amber-600 */
+}
+html.light .text-sky-300 {
+    color: #0369a1 !important; /* sky-700 */
+}
+html.light .text-sky-400 {
+    color: #0284c7 !important; /* sky-600 */
+}
+
+/* Light mode backgrounds for status badges and active pills */
+html.light .bg-sky-500\/20 {
+    background-color: rgba(14, 165, 233, 0.15) !important;
+}
+html.light .border-sky-500\/30,
+html.light .border-sky-500\/40 {
+    border-color: rgba(14, 165, 233, 0.45) !important;
+}
+html.light .bg-amber-500\/20 {
+    background-color: rgba(245, 158, 11, 0.15) !important;
+}
+html.light .border-amber-500\/30,
+html.light .border-amber-500\/40 {
+    border-color: rgba(245, 158, 11, 0.45) !important;
+}
+html.light .bg-emerald-500\/20 {
+    background-color: rgba(16, 185, 129, 0.15) !important;
+}
+html.light .border-emerald-500\/30,
+html.light .border-emerald-500\/40 {
+    border-color: rgba(16, 185, 129, 0.45) !important;
+}
+html.light .bg-rose-500\/20 {
+    background-color: rgba(244, 63, 94, 0.15) !important;
+}
+html.light .border-rose-500\/30,
+html.light .border-rose-500\/40 {
+    border-color: rgba(244, 63, 94, 0.45) !important;
+}
+
+/* Light mode alert callout backgrounds */
+html.light .bg-rose-950\/40 {
+    background-color: rgba(254, 242, 242, 0.95) !important;
+}
+html.light .bg-rose-950\/20 {
+    background-color: rgba(254, 242, 242, 0.8) !important;
+}
+html.light .bg-rose-950\/10,
+html.light .bg-rose-900\/10 {
+    background-color: rgba(254, 242, 242, 0.6) !important;
+}
+html.light .border-rose-900\/30,
+html.light .border-rose-900\/20 {
+    border-color: rgba(251, 113, 133, 0.5) !important; /* rose-400 with opacity */
+}
+html.light .bg-amber-950\/40 {
+    background-color: rgba(254, 243, 199, 0.95) !important;
+}
+html.light .bg-amber-950\/20 {
+    background-color: rgba(254, 243, 199, 0.8) !important;
+}
+html.light .bg-amber-900\/20,
+html.light .bg-amber-900\/30 {
+    background-color: #ffffff !important;
+    border-color: rgba(245, 158, 11, 0.4) !important;
+    color: #78350f !important;
+}
+html.light .text-amber-200 {
+    color: #78350f !important;
+}
+html.light .border-amber-800\/40,
+html.light .border-amber-800\/30 {
+    border-color: rgba(245, 158, 11, 0.3) !important;
+}
+html.light .bg-emerald-950\/40 {
+    background-color: rgba(236, 253, 245, 0.95) !important;
+}
+html.light .bg-emerald-950\/20 {
+    background-color: rgba(236, 253, 245, 0.8) !important;
+}
+html.light .border-emerald-800\/30,
+html.light .border-emerald-800\/20 {
+    border-color: rgba(52, 211, 153, 0.5) !important; /* emerald-400 with opacity */
+}
+html.light .bg-sky-950\/40 {
+    background-color: rgba(240, 249, 255, 0.95) !important;
+}
+html.light .bg-sky-950\/20 {
+    background-color: rgba(240, 249, 255, 0.8) !important;
+}
+
+/* Modal container overrides in light mode */
+html.light .relative.my-auto.bg-slate-900 {
+    box-shadow: 0 10px 40px -8px rgba(0, 0, 0, 0.15), 0 4px 16px -4px rgba(0, 0, 0, 0.1) !important;
+}
+html.light .ring-white\/5 {
+    --tw-ring-color: rgba(0, 0, 0, 0.06);
+}
+html.light .shadow-slate-950\/90 {
+    --tw-shadow-color: rgba(0, 0, 0, 0.12);
+}
+
+/* Light mode table nested pills (e.g. Alasan in Activity Log) */
+html.light .bg-slate-950\/80:not(.fixed),
+html.light .bg-slate-950\/70:not(.fixed),
+html.light .bg-slate-950\/60:not(.fixed) {
+    background-color: #f1f5f9 !important;
+    border-color: #e2e8f0 !important;
+}
+
+/* Light mode for unselected option cards in dialogs */
+html.light .bg-slate-950\/40:not(.fixed) {
+    background-color: rgba(241, 245, 249, 0.8) !important;
+}
+
+/* Light mode for active callout banner (emerald, rose, sky 30% variants) */
+html.light .bg-emerald-950\/30 {
+    background-color: rgba(236, 253, 245, 0.9) !important;
+}
+html.light .bg-rose-950\/30 {
+    background-color: rgba(254, 242, 242, 0.9) !important;
+}
+html.light .bg-sky-950\/30 {
+    background-color: rgba(240, 249, 255, 0.9) !important;
+}
+html.light .bg-amber-950\/30 {
+    background-color: rgba(254, 243, 199, 0.9) !important;
+}
+
+/* Rose-300/90 opacity variant used in callout spans */
+html.light .text-rose-300\/90 {
+    color: #be123c !important; /* rose-700 */
+}
+
+/* Top hero banners in light mode: smooth white surface, no distracting blurry smudges */
+html.light .rounded-2xl.bg-gradient-to-r.from-slate-900 {
+    background: linear-gradient(to right, #ffffff, #ffffff, #f8fafc) !important;
+    border-color: #e2e8f0 !important;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05) !important;
+}
+html.light .rounded-2xl.bg-gradient-to-r.from-slate-900 .blur-3xl {
+    opacity: 0.15 !important;
+}
+
+/* ─── Purple (Superadmin / Bypass banner) ─────────────────────────────────── */
+html.light .text-purple-100 {
+    color: #4c1d95 !important; /* purple-900 */
+}
+html.light .text-purple-200 {
+    color: #5b21b6 !important; /* purple-800 */
+}
+html.light .text-purple-300 {
+    color: #6d28d9 !important; /* purple-700 */
+}
+html.light .text-purple-300\/90 {
+    color: #7c3aed !important; /* purple-600 */
+}
+html.light .text-purple-400 {
+    color: #7c3aed !important; /* purple-600 */
+}
+html.light .bg-purple-500\/20 {
+    background-color: rgba(139, 92, 246, 0.12) !important;
+}
+html.light .border-purple-500\/30,
+html.light .border-purple-500\/40 {
+    border-color: rgba(109, 40, 217, 0.4) !important;
+}
+html.light .bg-purple-950\/40,
+html.light .bg-purple-950\/30 {
+    background-color: rgba(245, 243, 255, 0.95) !important;
+}
+html.light .bg-purple-950\/10 {
+    background-color: rgba(245, 243, 255, 0.6) !important;
+}
+html.light .border-purple-800\/50,
+html.light .border-purple-800\/40 {
+    border-color: rgba(139, 92, 246, 0.35) !important;
+}
+
+/* ─── Teal ────────────────────────────────────────────── */
+html.light .text-teal-300 {
+    color: #0f766e !important; /* teal-700 */
+}
+html.light .text-teal-400 {
+    color: #0d9488 !important; /* teal-600 */
+}
+html.light .bg-teal-500\/20 {
+    background-color: rgba(20, 184, 166, 0.12) !important;
+}
+html.light .border-teal-500\/30,
+html.light .border-teal-500\/40 {
+    border-color: rgba(15, 118, 110, 0.4) !important;
+}
+
+/* ─── Cyan (Finance role badge) ───────────────────────────────────────────── */
+html.light .text-cyan-300 {
+    color: #0e7490 !important; /* cyan-700 */
+}
+html.light .text-cyan-400 {
+    color: #0891b2 !important; /* cyan-600 */
+}
+html.light .bg-cyan-500\/20 {
+    background-color: rgba(6, 182, 212, 0.12) !important;
+}
+html.light .border-cyan-500\/30,
+html.light .border-cyan-500\/40 {
+    border-color: rgba(14, 116, 144, 0.4) !important;
+}
+
+/* ─── Indigo (Akuntan role badge) ─────────────────────────────────────────── */
+html.light .text-indigo-300 {
+    color: #3730a3 !important; /* indigo-800 */
+}
+html.light .text-indigo-400 {
+    color: #4338ca !important; /* indigo-700 */
+}
+html.light .bg-indigo-500\/20 {
+    background-color: rgba(99, 102, 241, 0.12) !important;
+}
+html.light .border-indigo-500\/30,
+html.light .border-indigo-500\/40 {
+    border-color: rgba(67, 56, 202, 0.4) !important;
+}
+
+/* ─── Blue (Manager role badge) ───────────────────────────────────────────── */
+html.light .text-blue-300 {
+    color: #1d4ed8 !important; /* blue-700 */
+}
+html.light .text-blue-400 {
+    color: #2563eb !important; /* blue-600 */
+}
+html.light .bg-blue-500\/20 {
+    background-color: rgba(59, 130, 246, 0.12) !important;
+}
+html.light .border-blue-500\/30,
+html.light .border-blue-500\/40 {
+    border-color: rgba(29, 78, 216, 0.4) !important;
+}
+
+/* Authentic physical paper document simulation (never inverts colors in light mode) */
+.paper-sheet {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    border-color: #cbd5e1 !important;
+}
+
+.paper-sheet,
+.paper-sheet *,
+.auth-hero-panel,
+.auth-hero-panel * {
+    --color-slate-950: 2 6 23 !important;
+    --color-slate-900: 15 23 42 !important;
+    --color-slate-850: 22 32 50 !important;
+    --color-slate-800: 30 41 59 !important;
+    --color-slate-700: 51 65 85 !important;
+    --color-slate-600: 71 85 105 !important;
+    --color-slate-500: 100 116 139 !important;
+    --color-slate-400: 148 163 184 !important;
+    --color-slate-300: 203 213 225 !important;
+    --color-slate-200: 226 232 240 !important;
+    --color-slate-100: 241 245 249 !important;
+    --color-slate-50: 248 250 252 !important;
+}
+
+.paper-sheet .text-slate-900,
+.paper-sheet h1.text-slate-900,
+.paper-sheet h2.text-slate-900,
+.paper-sheet h3.text-slate-900 {
+    color: #0f172a !important;
+}
+.paper-sheet .text-slate-800,
+.paper-sheet strong.text-slate-800 {
+    color: #1e293b !important;
+}
+.paper-sheet .text-slate-700 {
+    color: #334155 !important;
+}
+.paper-sheet .text-slate-600 {
+    color: #475569 !important;
+}
+.paper-sheet .text-slate-500 {
+    color: #64748b !important;
+}
+.paper-sheet .text-slate-400 {
+    color: #94a3b8 !important;
+}
+.paper-sheet .bg-slate-900,
+.paper-sheet .bg-slate-900 *,
+.paper-sheet .doc-title-badge,
+.paper-sheet .doc-title-badge *,
+.doc-title-badge,
+html.light .paper-sheet .doc-title-badge,
+html.light .paper-sheet .bg-slate-900 {
+    background-color: #0f172a !important;
+    color: #ffffff !important;
+}
+.paper-sheet .bg-slate-100,
+.paper-sheet .bg-slate-100\/80 {
+    background-color: #f1f5f9 !important;
+}
+.paper-sheet .border-slate-200 {
+    border-color: #e2e8f0 !important;
+}
+.paper-sheet .border-slate-300 {
+    border-color: #cbd5e1 !important;
+}
+.paper-sheet .border-slate-900 {
+    border-color: #0f172a !important;
+}
+
+/* Sleek ultra-thin auto-hiding custom scrollbar */
+html,
+body,
+.custom-scrollbar,
+* {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+}
+
+*:hover,
+.custom-scrollbar:hover {
+    scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
+}
+
+::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    border-radius: 9999px;
+    transition: background-color 0.25s ease;
+}
+
+*:hover::-webkit-scrollbar-thumb,
+.custom-scrollbar:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(148, 163, 184, 0.22);
+}
+
+::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:active {
+    background-color: rgba(148, 163, 184, 0.48) !important;
+}
+
+/* Light mode scrollbar adjustment */
+html.light *:hover::-webkit-scrollbar-thumb,
+html.light .custom-scrollbar:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(100, 116, 139, 0.25);
+}
+
+html.light ::-webkit-scrollbar-thumb:hover,
+html.light ::-webkit-scrollbar-thumb:active {
+    background-color: rgba(100, 116, 139, 0.5) !important;
+}
+
+/*
+ * Mobile (< 640px): iOS Safari zooms the page when a focused field is under 16px.
+ * Forms here are dense (text-xs) on desktop, so bump only the phone register.
+ */
+@media (max-width: 639px) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+    select,
+    textarea {
+        font-size: 16px !important;
+    }
+}
+
+/*
+ * Stacked tables (< 640px): each row becomes a card, each cell a "label ... value" line.
+ * Labels come from the <thead> via resources/js/responsive-tables.js (data-label on each td),
+ * so every x-table reflows without per-page markup. The first cell is the row's title.
+ * Cells are flow-root with a floated label so mixed inline content (date + badge) stays together.
+ */
+@media (max-width: 639px) {
+    .table-stack thead {
+        display: none;
+    }
+
+    .table-stack,
+    .table-stack tbody,
+    .table-stack tfoot,
+    .table-stack tr {
+        display: block;
+        width: 100%;
+    }
+
+    .table-stack tbody tr {
+        @apply px-4 py-3 space-y-1.5;
+    }
+
+    .table-stack td {
+        display: flow-root;
+        padding: 0 !important;
+        text-align: right !important;
+        white-space: normal !important;
+    }
+
+    .table-stack td::before {
+        content: attr(data-label);
+        float: left;
+        @apply me-4 text-left text-[11px] font-medium leading-5 text-slate-400;
+    }
+
+    .table-stack td[data-label=""]::before,
+    .table-stack tbody td:first-child::before,
+    .table-stack td[colspan]::before,
+    .table-stack tfoot td::before {
+        content: none;
+    }
+
+    .table-stack tbody td:first-child {
+        @apply text-left text-sm pb-0.5;
+        text-align: left !important;
+    }
+
+    .table-stack td[colspan] {
+        text-align: center !important;
+    }
+
+    /* Row actions get full thumb-sized targets once they are no longer squeezed into a column */
+    .table-stack td[data-label="Aksi"] :is(a, button) {
+        min-width: 44px;
+        min-height: 44px;
+        margin-block: 0 !important;
+    }
+
+    .table-stack tfoot tr {
+        @apply flex items-center justify-between gap-4 px-4 py-3;
+    }
+
+    .table-stack tfoot td {
+        display: block;
+        text-align: right !important;
+    }
+}
+
+/*
+ * Skeleton loading. Colors come from the slate tokens so they flip with the theme.
+ * The shimmer only runs while a page or table is actually loading, and stops for reduced motion.
+ */
+.sk {
+    position: relative;
+    overflow: hidden;
+    background-color: rgb(var(--color-slate-800));
+    border-radius: 0.375rem;
+}
+
+.sk::after,
+.sk-title::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgb(var(--color-slate-700) / 0.55), transparent);
+    animation: sk-shimmer 1.4s ease-in-out infinite;
+}
+
+.sk-text {
+    display: inline-block;
+    height: 0.72em;
+    max-width: 100%;
+    vertical-align: middle;
+    border-radius: 0.25rem;
+}
+
+.sk-page {
+    animation: sk-fade-in 160ms ease-out both;
+}
+
+main.sk-loading > :not(.sk-page) {
+    display: none !important;
+}
+
+main.sk-reveal {
+    animation: sk-fade-in 180ms ease-out both;
+}
+
+.sk-title {
+    position: relative;
+    overflow: hidden;
+    display: block;
+    width: 9rem;
+    height: 1rem;
+    color: transparent !important;
+    background-color: rgb(var(--color-slate-800));
+    border-radius: 0.375rem;
+}
+
+table.sk-refreshing tbody td {
+    position: relative;
+    color: transparent !important;
+}
+
+table.sk-refreshing tbody td > * {
+    visibility: hidden;
+}
+
+table.sk-refreshing tbody td:not(:empty)::after {
+    content: '';
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    width: min(60%, 7rem);
+    height: 0.7rem;
+    transform: translateY(-50%);
+    border-radius: 0.25rem;
+    background-color: rgb(var(--color-slate-800));
+    animation: sk-pulse 1.1s ease-in-out infinite;
+}
+
+@media (max-width: 639px) {
+    table.sk-refreshing.table-stack tbody td:not(:empty)::after {
+        left: auto;
+        right: 0;
+    }
+
+    table.sk-refreshing.table-stack tbody td:first-child::after {
+        left: 0;
+        right: auto;
+    }
+}
+
+@keyframes sk-shimmer {
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+@keyframes sk-pulse {
+    50% {
+        opacity: 0.45;
+    }
+}
+
+@keyframes sk-fade-in {
+    from {
+        opacity: 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sk::after,
+    .sk-title::after {
+        animation: none;
+        display: none;
+    }
+
+    table.sk-refreshing tbody td::after,
+    .sk-page,
+    main.sk-reveal {
+        animation: none;
+    }
+}
+
+/* Lucide swaps these placeholders for svgs once JS runs; sized up front they don't shift labels on load. */
+:where(i[data-lucide]) {
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+/* Sidebar mode is known before paint (html.sidebar-collapsed), so labels and rail-only bits are hidden by CSS
+   instead of waiting for Alpine's x-show, which left a flash of the full menu squeezed into the rail. */
+@media (max-width: 767px) {
+    [data-rail-only] {
+        display: none !important;
+    }
+}
+
+@media (min-width: 768px) {
+    html.sidebar-collapsed [data-rail-hidden],
+    html:not(.sidebar-collapsed) [data-rail-only] {
+        display: none !important;
+    }
+}
+
+/* Collapsed desktop sidebar: every item is centered in the 60px rail, and the nav scrollbar would eat into it. */
+@media (min-width: 768px) {
+    html.sidebar-collapsed .sidebar-nav :is(a, button),
+    html.sidebar-collapsed .sidebar-user > div > button {
+        justify-content: center;
+        padding-inline: 0;
+        gap: 0;
+    }
+
+    html.sidebar-collapsed .sidebar-brand {
+        justify-content: center;
+        padding-inline: 0;
+    }
+
+    html.sidebar-collapsed .sidebar-brand > a {
+        display: none;
+    }
+
+    html.sidebar-collapsed .sidebar-nav {
+        scrollbar-width: none;
+    }
+
+    html.sidebar-collapsed .sidebar-nav::-webkit-scrollbar {
+        display: none;
+    }
+}
+
+/* Horizontal chip rows (POS category filter) scroll by swipe without a visible bar. */
+.no-scrollbar {
+    scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
