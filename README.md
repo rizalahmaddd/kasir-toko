@@ -167,6 +167,34 @@ Tidak ada pendaftaran mandiri. Akun pegawai dibuat di **Pengaturan > Peran & Per
 
 Penolakan dari layar kasir (stok kurang, harga berubah, shift belum dibuka) dikembalikan `422` dengan `reason` dan `context` supaya aplikasi bisa menanganinya tanpa membaca teks pesan. Pengaturan (profil perusahaan, kasir, peran, fitur, backup) sengaja hanya tersedia di web.
 
+### TODO Aplikasi Mobile
+
+Sisi aplikasi (semua endpoint sudah tersedia):
+
+- [ ] Login password & OTP WhatsApp, simpan token di secure storage, tangani `401` dengan kembali ke layar login
+- [ ] Dashboard, notifikasi (badge dari `notifications/unread-count`), dan pencarian global
+- [ ] Layar kasir: katalog + filter kategori, scan barcode kamera via `pos/products/lookup`, keranjang dengan jumlah desimal, diskon sesuai izin
+- [ ] Checkout semua metode bayar (tunai, QRIS bernominal, transfer, kartu, split, kasbon) dengan `client_uuid` per keranjang supaya retry tidak dobel
+- [ ] Tangani penolakan `422` berdasarkan `reason` (harga berubah, stok kurang, shift belum dibuka) tanpa membaca teks pesan
+- [ ] Simpan keranjang aktif di perangkat dan pulihkan saat aplikasi dibuka ulang
+- [ ] Transaksi tertunda: simpan, lanjutkan, hapus
+- [ ] Shift: buka, kas masuk/keluar, tutup dengan selisih, cetak rekap
+- [ ] Riwayat penjualan, detail, void dengan alasan, kirim struk lewat WhatsApp
+- [ ] Piutang: daftar & pelunasan bertahap
+- [ ] Master data produk/kategori/pelanggan termasuk unggah foto produk
+- [ ] Stok: daftar, ringkasan, kartu stok, stok masuk/keluar/opname
+- [ ] Laporan penjualan (ringkasan, harian, produk) dan log aktivitas
+- [ ] Cetak struk ke printer thermal Bluetooth dari teks `sales/{id}/receipt` (sudah menyertakan `paper_width`)
+- [ ] Cetak rekap shift / simpan PDF: render HTML dari `print/*` di WebView
+- [ ] Sembunyikan menu sesuai izin & sakelar fitur dari `auth/me`
+
+Belum ada di API (perlu dikerjakan di backend kalau dibutuhkan):
+
+- [ ] Push notification (FCM): endpoint registrasi device token dan pengiriman notifikasi ke perangkat
+- [ ] Layar pelanggan dari aplikasi: endpoint setara `pos.display.push` untuk mengirim isi keranjang ke layar yang dipasangkan
+- [ ] Ekspor riwayat transaksi/laporan ke file
+- [ ] Mode offline: antrean checkout saat koneksi putus lalu sinkron otomatis
+
 ## Menjalankan Test & Pemeriksaan Kode
 
 ```bash
