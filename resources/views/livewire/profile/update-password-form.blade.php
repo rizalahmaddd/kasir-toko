@@ -31,6 +31,7 @@ new class extends Component
         Auth::user()->update([
             'password' => Hash::make($validated['password']),
         ]);
+        Auth::user()->tokens()->delete();
 
         $this->reset('current_password', 'password', 'password_confirmation');
 

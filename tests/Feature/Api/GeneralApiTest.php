@@ -16,9 +16,13 @@ it('shows only the stats a role may see', function () {
 
 it('drops stats of disabled features', function () {
     apiActingAs('admin');
-    Features::setDisabled(['master-data']);
+    Features::setDisabled(['master-data', 'inventory', 'pos']);
 
-    expect($this->getJson('/api/v1/dashboard')->json('data.stats'))->toBe([]);
+    $this->getJson('/api/v1/dashboard')
+        ->assertOk()
+        ->assertJsonPath('data.stats', [])
+        ->assertJsonPath('data.today', null)
+        ->assertJsonPath('data.recent_sales', null);
 });
 
 it('lists notifications with a deep link and marks them read', function () {

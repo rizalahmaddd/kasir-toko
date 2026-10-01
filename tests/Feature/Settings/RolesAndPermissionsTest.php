@@ -5,6 +5,7 @@ use App\Models\Setting;
 use App\Models\User;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
+use Illuminate\Support\Facades\Hash;
 use Livewire\Livewire;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Permission\Models\Role;
@@ -227,4 +228,92 @@ test('role modals are opened and closed through browser modal events', function 
         ->call('openUserRolesModal', $user->id)
         ->assertDispatched('open-modal', 'user-roles')
         ->assertSee($user->name);
+});
+
+test('user managers without the roles permission only get the users tab', function () {
+    actingAsRole('admin');
+
+    $this->get(route('settings.roles-and-permissions'))->assertOk();
+
+    Livewire::test(RolesAndPermissions::class)
+        ->assertSet('tab', 'users')
+        ->set('tab', 'matrix')
+        ->assertSet('tab', 'users');
+});
+
+test('user managers cannot hand out or take away the superadmin role', function () {
+    $admin = actingAsRole('admin');
+    $superadmin = User::factory()->create()->assignRole('superadmin');
+
+    Livewire::test(RolesAndPermissions::class)
+        ->set('editingUserId', $admin->id)
+        ->set('editingUserRoles', ['admin', 'superadmin'])
+        ->call('saveUserRoles')
+        ->assertDispatched('notify', type: 'error');
+
+    Livewire::test(RolesAndPermissions::class)
+        ->set('editingUserId', $superadmin->id)
+        ->set('editingUserRoles', ['staff'])
+        ->call('saveUserRoles');
+
+    expect($admin->fresh()->hasRole('superadmin'))->toBeFalse()
+        ->and($superadmin->fresh()->hasRole('superadmin'))->toBeTrue();
+});
+
+test('user managers create accounts that can log in with the chosen role', function () {
+    actingAsRole('admin');
+
+    Livewire::test(RolesAndPermissions::class)
+        ->call('openCreateUserModal')
+        ->set('newUserName', 'Sari Kasir')
+        ->set('newUserUsername', 'Sari.Kasir')
+        ->set('newUserEmail', 'sari@example.test')
+        ->set('newUserPhone', '+62 812-1111-2222')
+        ->set('newUserPassword', 'rahasia123')
+        ->set('newUserRoles', ['kasir'])
+        ->call('createUser')
+        ->assertHasNoErrors()
+        ->assertDispatched('close-modal', 'create-user');
+
+    $user = User::where('username', 'sari.kasir')->sole();
+    expect($user->phone)->toBe('081211112222')
+        ->and($user->hasRole('kasir'))->toBeTrue()
+        ->and(Hash::check('rahasia123', $user->password))->toBeTrue();
+
+    Livewire::test(RolesAndPermissions::class)
+        ->set('newUserName', 'Tanpa Peran')
+        ->set('newUserUsername', 'tanpa')
+        ->set('newUserEmail', 'tanpa@example.test')
+        ->set('newUserPassword', 'rahasia123')
+        ->set('newUserRoles', ['superadmin'])
+        ->call('createUser')
+        ->assertHasErrors('newUserRoles');
+
+    expect(User::where('username', 'tanpa')->exists())->toBeFalse();
+});
+
+test('user managers sign a user out of every mobile device', function () {
+    actingAsRole('admin');
+    $cashier = User::factory()->create()->assignRole('kasir');
+    $cashier->createToken('hp-kasir');
+    $cashier->createToken('tablet');
+
+    Livewire::test(RolesAndPermissions::class)
+        ->call('revokeUserTokens', $cashier->id)
+        ->assertDispatched('notify');
+
+    expect($cashier->tokens()->count())->toBe(0);
+});
+
+test('a new username must start with a letter so it is never mistaken for a phone number', function () {
+    actingAsRole('admin');
+
+    Livewire::test(RolesAndPermissions::class)
+        ->set('newUserName', 'Test User')
+        ->set('newUserUsername', '0812345')
+        ->set('newUserEmail', 'test@example.com')
+        ->set('newUserPassword', 'rahasia123')
+        ->set('newUserRoles', ['kasir'])
+        ->call('createUser')
+        ->assertHasErrors(['newUserUsername' => 'regex']);
 });

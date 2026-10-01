@@ -29,9 +29,9 @@
             <span class="inline-flex items-center transition-colors">
                 @if ($isActive)
                     @if ($currentSortDirection === 'asc')
-                        <i data-lucide="arrow-up" class="w-3.5 h-3.5 text-emerald-400"></i>
+                        <i data-lucide="arrow-up" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
                     @else
-                        <i data-lucide="arrow-down" class="w-3.5 h-3.5 text-emerald-400"></i>
+                        <i data-lucide="arrow-down" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
                     @endif
                 @else
                     <i data-lucide="chevrons-up-down" class="w-3.5 h-3.5 text-slate-600 group-hover:text-slate-400"></i>

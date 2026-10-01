@@ -76,6 +76,7 @@ class WhatsAppOtpService
             'hash' => Hash::make($otp),
             'phone' => $user->phone,
         ], now()->addMinutes(5));
+        Cache::forget("wa_otp_fails_{$user->id}");
 
         // Set cooldown 60 detik
         Cache::put($cooldownKey, now()->addSeconds(60)->timestamp, now()->addSeconds(60));

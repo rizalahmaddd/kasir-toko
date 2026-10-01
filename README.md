@@ -4,8 +4,9 @@ Aplikasi kasir berbasis web untuk toko, dirancang untuk tablet dan ponsel tapi t
 
 ## Fitur Utama
 
-- **Layar kasir** (`/kasir`): katalog produk dengan filter kategori, pencarian nama/SKU, scan barcode lewat scanner USB/Bluetooth (tanpa perlu klik kolom pencarian) atau kamera ponsel (browser yang mendukung `BarcodeDetector`), keranjang dengan jumlah desimal untuk barang timbangan, catatan & diskon per barang, diskon transaksi (Rp/%), dan pajak opsional.
-- **Pembayaran**: tunai (saran nominal & kembalian), QRIS, transfer, kartu, bayar campuran (split), dan kasbon atas nama pelanggan. Papan angka di layar sentuh, pintasan keyboard di laptop (`F2` cari, `F9` bayar, `Enter` selesai).
+- **Dashboard**: penjualan hari ini dibanding kemarin, status shift aktif/belum dibuka, tombol langsung ke layar kasir, ringkasan transaksi, laba kotor, stok menipis, kasbon, dan grafik penjualan 7 hari. Kasir hanya melihat penjualannya sendiri.
+- **Layar kasir** (`/kasir`): katalog produk dengan filter kategori, SKU dan sisa stok di tiap kartu (penanda **Habis** untuk stok kosong), pencarian nama/SKU, scan barcode lewat scanner USB/Bluetooth (tanpa perlu klik kolom pencarian) atau kamera ponsel (browser yang mendukung `BarcodeDetector`), keranjang dengan jumlah desimal untuk barang timbangan, catatan & diskon per barang, diskon transaksi (Rp/%), dan pajak opsional.
+- **Pembayaran**: tunai (pilihan pecahan uang & kembalian), QRIS, transfer, kartu, bayar campuran (split), dan kasbon atas nama pelanggan. Papan angka di layar sentuh, pintasan keyboard di laptop (`F2` cari, `F9` bayar, `Enter` selesai).
 - **Struk**: cetak thermal 58/80 mm lewat dialog cetak browser, kirim lewat WhatsApp, cetak ulang dari riwayat.
 - **Transaksi tertunda**: simpan keranjang sementara lalu lanjutkan nanti.
 - **Layar pelanggan** (customer display): layar kedua yang menghadap pembeli, bisa berupa jendela di monitor kedua atau tablet/HP lain yang dipasangkan dengan memindai QR (tanpa login). Menampilkan sambutan + slideshow promo + teks berjalan saat diam, daftar belanja & total saat transaksi, kembalian, dan layar terima kasih. Tema, teks, slideshow, dan durasi diatur di Pengaturan → Layar Pelanggan.
@@ -35,7 +36,7 @@ Aplikasi kasir berbasis web untuk toko, dirancang untuk tablet dan ponsel tapi t
 
 ## Akun Demo
 
-`php artisan migrate:fresh --seed` membuat katalog toko contoh, riwayat penjualan 6 hari, dan akun berikut (password `password`):
+`php artisan migrate:fresh --seed` membuat katalog toko contoh, riwayat penjualan 6 hari, logo toko contoh (dari `database/seeders/images/branding/`, bisa diganti di Pengaturan Perusahaan), gambar slideshow layar pelanggan, dan akun berikut (password `password`):
 
 | Peran | Login | Akses |
 |---|---|---|
@@ -148,6 +149,23 @@ Lalu daftarkan modulnya di beberapa registry:
 7. Jalankan `php artisan test --compact`. `FeatureTogglesTest` gagal kalau ada route yang belum terdaftar di `Features::MODULES`, dan `ApiDocumentationTest` gagal kalau ada endpoint API tanpa sakelar fitur atau belum terdokumentasi.
 
 Untuk tautan ke halaman modul lain, pakai `<x-feature-link :href="...">` supaya tautannya otomatis jadi teks biasa saat fiturnya dimatikan.
+
+## REST API (Aplikasi Mobile)
+
+Semua endpoint ada di `/api/v1`, autentikasi Sanctum Bearer token, dan hak aksesnya sama dengan web (peran, izin, dan sakelar fitur). Dokumentasi interaktif: `/docs/api` (Scalar), spesifikasi mentah: `/api/openapi.json`; keduanya hanya bisa dibuka superadmin yang sedang login. Untuk developer mobile, ekspor ke file dengan `php artisan api:docs --output=storage/app/openapi.json`.
+
+Tidak ada pendaftaran mandiri. Akun pegawai dibuat di **Pengaturan > Peran & Perizinan > Penugasan Pengguna** (izin `users.manage`); dari sana juga admin bisa mengeluarkan akun dari semua perangkat mobile. Ganti/reset password di web otomatis mencabut sesi mobile.
+
+| Grup | Endpoint |
+| --- | --- |
+| Akun | `auth/*` (login password/OTP WhatsApp, profil, logout), `dashboard`, `meta`, `search`, `notifications` |
+| Master Data | `master-data/customers`, `master-data/categories`, `master-data/products` (+ `products/{id}/image`) |
+| Stok | `inventory/stock`, `inventory/stock/summary`, `inventory/movements`, `inventory/adjustments` |
+| Kasir | `pos/config`, `pos/categories`, `pos/products`, `pos/products/lookup`, `pos/customers`, `pos/qris`, `pos/checkout`, `pos/shift`, `pos/held-orders` |
+| Penjualan | `sales` (+ `void`, `receipt`), `shifts` (+ `sales`, `close`, `cash-movements`), `receivables` (+ `payments`), `print/receipt/{sale}`, `print/shift/{shift}` |
+| Laporan | `reports/sales/summary`, `reports/sales/daily`, `reports/sales/products`, `reports/activity-log` |
+
+Penolakan dari layar kasir (stok kurang, harga berubah, shift belum dibuka) dikembalikan `422` dengan `reason` dan `context` supaya aplikasi bisa menanganinya tanpa membaca teks pesan. Pengaturan (profil perusahaan, kasir, peran, fitur, backup) sengaja hanya tersedia di web.
 
 ## Menjalankan Test & Pemeriksaan Kode
 

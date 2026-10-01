@@ -44,6 +44,19 @@ class Product extends Model
     ];
 
     /**
+     * A deleted product must not hold on to its barcode: the replacement product is usually
+     * scanned with the same one. Sale items keep their own copy of the product data.
+     */
+    protected static function booted(): void
+    {
+        static::softDeleted(function (Product $product) {
+            if ($product->barcode !== null) {
+                $product->forceFill(['barcode' => null])->saveQuietly();
+            }
+        });
+    }
+
+    /**
      * @return BelongsTo<Category, $this>
      */
     public function category(): BelongsTo

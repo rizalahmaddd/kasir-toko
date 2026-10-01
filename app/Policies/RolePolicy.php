@@ -71,6 +71,23 @@ class RolePolicy
     }
 
     /**
+     * Halaman Peran & Perizinan: pengelola peran melihat semua tab, pemegang users.manage cukup
+     * tab pengguna.
+     */
+    public function open(User $user): bool
+    {
+        return $this->viewAny($user) || $this->manageUserRoles($user);
+    }
+
+    /**
+     * Tanpa batasan ini pemegang users.manage bisa mencentang peran superadmin untuk dirinya sendiri.
+     */
+    public function assignSuperadmin(User $user): bool
+    {
+        return $user->hasRole('superadmin');
+    }
+
+    /**
      * Cek perizinan secara aman terhadap database pengujian yang belum menjalankan seeder.
      */
     protected function checkPermissionOrRole(User $user, string $permission): bool

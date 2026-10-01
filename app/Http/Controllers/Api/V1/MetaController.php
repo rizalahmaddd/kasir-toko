@@ -2,9 +2,14 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\CashMovementType;
+use App\Enums\PaymentMethod;
+use App\Enums\SaleStatus;
+use App\Enums\StockMovementType;
 use App\Http\Resources\V1\MetaResource;
 use App\Http\Resources\V1\NotificationResource;
 use App\Http\Resources\V1\SearchResultResource;
+use App\Livewire\MasterData\Products;
 use App\Support\Branding;
 use App\Support\OpenApi\Attributes\ApiQuery;
 use App\Support\OpenApi\Attributes\ApiResponse;
@@ -32,6 +37,12 @@ class MetaController extends Controller
             ],
             'enums' => [
                 'customer_payment_terms' => ['0' => 'Tunai', '14' => '14 hari', '30' => '30 hari', '45' => '45 hari'],
+                'payment_methods' => PaymentMethod::options(),
+                'sale_statuses' => collect(SaleStatus::cases())->mapWithKeys(fn (SaleStatus $status) => [$status->value => $status->label()])->all(),
+                'stock_movement_types' => collect(StockMovementType::cases())->mapWithKeys(fn (StockMovementType $type) => [$type->value => $type->label()])->all(),
+                'stock_adjustment_types' => ['stock_in' => StockMovementType::StockIn->label(), 'stock_out' => StockMovementType::StockOut->label(), 'opname' => StockMovementType::Opname->label()],
+                'cash_movement_types' => collect(CashMovementType::cases())->mapWithKeys(fn (CashMovementType $type) => [$type->value => $type->label()])->all(),
+                'product_units' => array_combine(Products::UNITS, Products::UNITS),
             ],
         ]);
     }

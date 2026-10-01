@@ -55,8 +55,8 @@
         </x-modal-header>
 
         <x-segmented class="w-full [&>*]:flex-1">
-            <x-tab-button x-bind:aria-pressed="discountForm.type === 'amount'" @click="discountForm.type = 'amount'" x-bind:class="discountForm.type === 'amount' ? '!bg-emerald-500/10 !text-emerald-400 !border-emerald-500/30' : ''">Rupiah</x-tab-button>
-            <x-tab-button x-bind:aria-pressed="discountForm.type === 'percent'" @click="discountForm.type = 'percent'" x-bind:class="discountForm.type === 'percent' ? '!bg-emerald-500/10 !text-emerald-400 !border-emerald-500/30' : ''">Persen</x-tab-button>
+            <x-tab-button x-bind:aria-pressed="discountForm.type === 'amount'" @click="discountForm.type = 'amount'" x-bind:class="discountForm.type === 'amount' ? '!bg-emerald-500/10 !text-emerald-600 dark:!text-emerald-400 !border-emerald-500/30' : ''">Rupiah</x-tab-button>
+            <x-tab-button x-bind:aria-pressed="discountForm.type === 'percent'" @click="discountForm.type = 'percent'" x-bind:class="discountForm.type === 'percent' ? '!bg-emerald-500/10 !text-emerald-600 dark:!text-emerald-400 !border-emerald-500/30' : ''">Persen</x-tab-button>
         </x-segmented>
 
         <div class="relative">

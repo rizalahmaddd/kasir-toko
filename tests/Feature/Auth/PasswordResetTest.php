@@ -51,6 +51,7 @@ test('password can be reset with valid token', function () {
     Notification::fake();
 
     $user = User::factory()->create();
+    $user->createToken('hp');
 
     Volt::test('pages.auth.forgot-password')
         ->set('email', $user->email)
@@ -70,4 +71,6 @@ test('password can be reset with valid token', function () {
 
         return true;
     });
+
+    expect($user->tokens()->count())->toBe(0);
 });

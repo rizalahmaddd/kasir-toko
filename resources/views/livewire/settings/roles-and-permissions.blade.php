@@ -4,6 +4,7 @@
         'matrix' => ['label' => 'Matriks Perizinan', 'icon' => 'table', 'hint' => 'Tabel komparasi seluruh peran'],
         'users' => ['label' => 'Penugasan Pengguna', 'icon' => 'users', 'hint' => 'Atur peran untuk setiap akun'],
     ];
+    $tabs = array_intersect_key($tabs, array_flip($availableTabs));
 
     $badgeColors = [
         'superadmin' => 'bg-purple-500/20 text-purple-300 border-purple-500/30',
@@ -31,7 +32,7 @@
         @endcan
     </div>
 
-    {{-- Tab navigation bar --}}
+    @if (count($tabs) > 1)
     <div role="tablist" aria-label="{{ __('Bagian pengaturan peran') }}"
         class="flex gap-1 p-1 rounded-xl bg-slate-900 border border-slate-800 overflow-x-auto">
         @foreach ($tabs as $key => $item)
@@ -50,6 +51,7 @@
             </button>
         @endforeach
     </div>
+    @endif
 
     {{-- TAB 1: PERAN & HAK AKSES --}}
     @if ($tab === 'roles')
@@ -404,6 +406,11 @@
 
                     {{-- User Search --}}
                     <x-search-input class="w-full sm:w-60" variant="form" wire:model.live.debounce.150ms="userSearch" placeholder="Cari nama / email..." />
+
+                    <x-primary-button size="sm" type="button" wire:click="openCreateUserModal" class="justify-center shrink-0">
+                        <i data-lucide="user-plus" class="w-4 h-4"></i>
+                        {{ __('Tambah Pengguna') }}
+                    </x-primary-button>
                 </div>
             </div>
 
@@ -414,6 +421,7 @@
                             <th class="p-3 font-semibold">{{ __('Nama & Username') }}</th>
                             <th class="p-3 font-semibold">{{ __('Email') }}</th>
                             <th class="p-3 font-semibold">{{ __('Peran Saat Ini') }}</th>
+                            <th class="p-3 font-semibold">{{ __('Aplikasi Mobile') }}</th>
                             <th class="p-3 font-semibold text-right">{{ __('Aksi') }}</th>
                         </tr>
                     </thead>
@@ -449,15 +457,31 @@
                                         @endforelse
                                     </div>
                                 </td>
-                                <td class="p-3 text-right">
-                                    <x-secondary-button size="xs" type="button" wire:click="openUserRolesModal({{ $user->id }})">
-                                        {{ __('Ubah Peran') }}
-                                    </x-secondary-button>
+                                <td class="p-3 text-slate-300">
+                                    @if ($user->tokens_count > 0)
+                                        {{ $user->tokens_count }} {{ __('perangkat') }}
+                                    @else
+                                        <span class="text-slate-400">{{ __('Tidak login') }}</span>
+                                    @endif
+                                </td>
+                                <td class="p-3">
+                                    <div class="flex justify-end gap-2">
+                                        @if ($user->tokens_count > 0)
+                                            <x-secondary-button size="xs" type="button"
+                                                wire:click="revokeUserTokens({{ $user->id }})"
+                                                wire:confirm="{{ __('Keluarkan :name dari semua perangkat mobile? Pengguna harus login ulang di aplikasi.', ['name' => $user->name]) }}">
+                                                {{ __('Keluarkan dari HP') }}
+                                            </x-secondary-button>
+                                        @endif
+                                        <x-secondary-button size="xs" type="button" wire:click="openUserRolesModal({{ $user->id }})">
+                                            {{ __('Ubah Peran') }}
+                                        </x-secondary-button>
+                                    </div>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="4" class="p-6 text-center text-slate-500">
+                                <td colspan="5" class="p-6 text-center text-slate-400">
                                     {{ __('Tidak ada data pengguna yang cocok dengan pencarian.') }}
                                 </td>
                             </tr>
@@ -535,6 +559,7 @@
 
                 <div class="space-y-2 max-h-72 overflow-y-auto custom-scrollbar pr-1">
                     @foreach ($allRoles as $r)
+                        @continue($r->name === 'superadmin' && ! auth()->user()->can('assignSuperadmin', \Spatie\Permission\Models\Role::class))
                         @php
                             $isSuperRole = $r->name === 'superadmin';
                         @endphp
@@ -568,4 +593,53 @@
             </x-modal-actions>
         </div>
     </x-modal>
+    <x-record-form-modal name="create-user" :title="__('Tambah Pengguna')" subtitle="Akun login untuk pegawai beserta perannya" icon="user-plus" max-width="2xl" close-action="closeCreateUserModal">
+        <form wire:submit="createUser" class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="sm:col-span-2">
+                    <x-input-label for="newUserName" :value="__('Nama')" />
+                    <x-text-input wire:model="newUserName" id="newUserName" class="block mt-1 w-full" autocomplete="off" required />
+                    <x-input-error :messages="$errors->get('newUserName')" class="mt-1.5" />
+                </div>
+                <div>
+                    <x-input-label for="newUserUsername" :value="__('Username')" />
+                    <x-text-input wire:model="newUserUsername" id="newUserUsername" class="block mt-1 w-full" autocapitalize="none" spellcheck="false" autocomplete="off" required />
+                    <x-input-error :messages="$errors->get('newUserUsername')" class="mt-1.5" />
+                </div>
+                <div>
+                    <x-input-label for="newUserPhone" :value="__('Nomor HP / WhatsApp (opsional)')" />
+                    <x-text-input wire:model="newUserPhone" id="newUserPhone" class="block mt-1 w-full" type="tel" inputmode="tel" placeholder="081234567890" autocomplete="off" />
+                    <x-input-error :messages="$errors->get('newUserPhone')" class="mt-1.5" />
+                </div>
+                <div>
+                    <x-input-label for="newUserEmail" :value="__('Email')" />
+                    <x-text-input wire:model="newUserEmail" id="newUserEmail" class="block mt-1 w-full" type="email" autocomplete="off" required />
+                    <x-input-error :messages="$errors->get('newUserEmail')" class="mt-1.5" />
+                </div>
+                <div>
+                    <x-input-label for="newUserPassword" :value="__('Password awal')" />
+                    <x-text-input wire:model="newUserPassword" id="newUserPassword" class="block mt-1 w-full" type="password" autocomplete="new-password" required />
+                    <x-input-error :messages="$errors->get('newUserPassword')" class="mt-1.5" />
+                </div>
+            </div>
+
+            <fieldset>
+                <legend class="text-sm font-medium text-slate-300">{{ __('Peran') }}</legend>
+                <div class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    @foreach ($allRoles as $r)
+                        @continue($r->name === 'superadmin' && ! auth()->user()->can('assignSuperadmin', \Spatie\Permission\Models\Role::class))
+                        <x-checkbox-card wire:model="newUserRoles" value="{{ $r->name }}" :label="Str::title($r->name)" :description="$r->name === 'superadmin' ? __('Akses penuh ke seluruh sistem.') : __(':count izin akses', ['count' => $r->permissions_count])" />
+                    @endforeach
+                </div>
+                <x-input-error :messages="$errors->get('newUserRoles')" class="mt-1.5" />
+            </fieldset>
+
+            <x-modal-actions>
+                <x-secondary-button x-on:click="$dispatch('close')" wire:click="closeCreateUserModal">{{ __('Batal') }}</x-secondary-button>
+                <x-primary-button>
+                    <x-loading-label target="createUser" loading="Menyimpan...">{{ __('Simpan Pengguna') }}</x-loading-label>
+                </x-primary-button>
+            </x-modal-actions>
+        </form>
+    </x-record-form-modal>
 </div>

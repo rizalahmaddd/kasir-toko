@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureApiFeatureEnabled;
 use App\Http\Middleware\EnsureFeatureEnabled;
+use App\Services\Pos\PosException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -42,6 +43,17 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(function (NotFoundHttpException $e, Request $request) {
             if ($request->is('api/*') && $e->getPrevious() instanceof ModelNotFoundException) {
                 return response()->json(['message' => __('Data tidak ditemukan.')], 404);
+            }
+        });
+        // `reason` lets the app react without parsing text (e.g. price_changed carries the new prices in `context`).
+        $exceptions->render(function (PosException $e, Request $request) {
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'message' => $e->getMessage(),
+                    'errors' => ['message' => [$e->getMessage()]],
+                    'reason' => $e->reason,
+                    'context' => (object) $e->context,
+                ], 422);
             }
         });
     })->create();

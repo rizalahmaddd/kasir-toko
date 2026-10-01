@@ -77,6 +77,8 @@ class AppServiceProvider extends ServiceProvider
         // Master data dibaca semua akun yang punya izin lihat; dikelola lewat izin kelola.
         Gate::define('view-master-data', fn ($user) => $user->can('master-data.view'));
         Gate::define('manage-master-data', fn ($user) => $user->can('master-data.manage'));
+        // Only superadmin passes, through Gate::before above.
+        Gate::define('view-api-docs', fn ($user) => false);
 
         RateLimiter::for('display', fn (Request $request) => Limit::perMinute(300)->by($request->user()?->id ?: $request->ip()));
         RateLimiter::for('api', fn (Request $request) => Limit::perMinute(120)->by($request->user()?->id ?: $request->ip()));

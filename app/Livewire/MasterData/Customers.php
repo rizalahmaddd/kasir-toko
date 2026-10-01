@@ -127,6 +127,11 @@ class Customers extends Component
         return Customer::class;
     }
 
+    protected function guardDelete($record): ?string
+    {
+        return $record->deletionBlockedReason();
+    }
+
     protected function resetForm(): void
     {
         $this->reset(['code', 'name', 'type', 'contact_person', 'phone', 'email', 'address', 'npwp']);

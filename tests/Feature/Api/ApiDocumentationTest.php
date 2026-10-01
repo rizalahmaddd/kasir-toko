@@ -43,7 +43,15 @@ it('documents every API endpoint', function () {
         ->and($document['components']['schemas'])->toHaveKeys(['Token', 'Customer', 'CurrentUser']);
 });
 
-it('serves the OpenAPI document for Scalar', function () {
+it('serves the OpenAPI document for Scalar to superadmins only', function () {
+    $this->get('/docs/api')->assertRedirect('/login');
+    $this->get('/api/openapi.json')->assertUnauthorized();
+
+    actingAsRole('admin');
+    $this->get('/docs/api')->assertForbidden();
+    $this->getJson('/api/openapi.json')->assertForbidden();
+
+    actingAsSuperAdmin();
     $this->getJson('/api/openapi.json')
         ->assertOk()
         ->assertJsonPath('openapi', '3.1.0')

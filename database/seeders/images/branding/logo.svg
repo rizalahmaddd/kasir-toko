@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="112" fill="#059669"/>
+
+  <!-- Shopping bag body -->
+  <path d="M168 196h176l-22 168H190L168 196z" fill="none" stroke="white" stroke-width="22" stroke-linejoin="round"/>
+
+  <!-- Bag handle left -->
+  <path d="M210 196c0-25 11-72 46-72" fill="none" stroke="white" stroke-width="22" stroke-linecap="round"/>
+
+  <!-- Bag handle right -->
+  <path d="M302 196c0-25-11-72-46-72" fill="none" stroke="white" stroke-width="22" stroke-linecap="round"/>
+
+  <!-- Checkmark inside bag -->
+  <polyline points="218,290 244,318 294,268" fill="none" stroke="white" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -84,18 +84,20 @@
         <section class="flex-1 min-w-0 flex flex-col">
             <div class="shrink-0 p-2.5 sm:p-4 pb-2 space-y-2.5">
                 <div class="flex items-center gap-2">
-                    <div class="relative flex-1">
-                        <i data-lucide="scan-barcode" aria-hidden="true" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                    <div class="relative flex-1 group">
+                        <i data-lucide="scan-barcode" aria-hidden="true" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-400 transition-colors pointer-events-none"></i>
                         <input type="search" x-ref="search" autocomplete="off" enterkeyhint="search"
                             wire:model.live.debounce.300ms="search"
                             @keydown.enter.prevent="submitSearch($event.target)"
-                            placeholder="Cari nama / SKU, atau scan barcode"
+                            placeholder="Ketik nama produk, scan barcode, atau SKU..."
                             aria-label="Cari produk atau scan barcode"
-                            class="w-full h-12 bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 text-sm text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500">
-                        <span class="hidden lg:block absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 font-mono pointer-events-none">F2</span>
+                            class="w-full h-11 sm:h-12 bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-12 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition shadow-inner">
+                        <div class="hidden sm:flex items-center gap-1 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                            <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] font-mono text-slate-400">F2</kbd>
+                        </div>
                     </div>
-                    <button type="button" x-show="camera.supported" x-cloak @click="startCamera()" title="Scan pakai kamera"
-                        class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-emerald-400 hover:border-emerald-500/40 shrink-0">
+                    <button type="button" x-show="camera.supported" x-cloak @click="startCamera()" title="Scan pakai kamera perangkat"
+                        class="inline-flex items-center justify-center w-11 sm:w-12 h-11 sm:h-12 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-emerald-400 hover:border-emerald-500/40 shrink-0 transition active:scale-95 shadow-inner cursor-pointer">
                         <i data-lucide="camera" class="w-5 h-5"></i>
                         <span class="sr-only">Scan pakai kamera</span>
                     </button>
@@ -129,7 +131,7 @@
                         </x-empty-state>
                     </div>
                 @else
-                    <div class="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2 sm:gap-2.5">
+                    <div class="grid grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(10.5rem,1fr))] gap-2.5 sm:gap-3">
                         @foreach ($products->take($limit) as $product)
                             @php
                                 $stock = (float) $product->stock;
@@ -140,31 +142,54 @@
                                 data-product="{{ json_encode(\App\Livewire\Pos\Cashier::productPayload($product)) }}"
                                 @click="add(JSON.parse($el.dataset.product))"
                                 @class([
-                                    'relative text-left rounded-xl border bg-slate-900 p-2.5 flex flex-col gap-2 min-h-[8.5rem] transition active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500',
-                                    'border-slate-800 hover:border-slate-700' => ! $out,
-                                    'border-slate-800/60 opacity-60' => $out,
+                                    'group relative text-left rounded-xl border p-2 sm:p-2.5 flex flex-col gap-2 transition-all duration-150 active:scale-[0.97] focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 cursor-pointer shadow-sm hover:shadow-md hover:border-slate-700/80 select-none',
+                                    'bg-slate-900 border-slate-800/80 hover:bg-slate-800/60' => ! $out,
+                                    'bg-slate-900/50 border-slate-800/60 opacity-60' => $out,
                                 ])
-                                :class="qtyInCart({{ $product->id }}) > 0 && '!border-emerald-500/60 bg-emerald-500/5'">
-                                <span x-show="qtyInCart({{ $product->id }}) > 0" x-cloak
-                                    class="absolute top-1.5 right-1.5 min-w-[24px] h-6 px-1.5 rounded-full bg-emerald-600 text-slate-950 text-xs font-bold flex items-center justify-center tabular-nums"
-                                    x-text="quantity(qtyInCart({{ $product->id }}))"></span>
+                                :class="qtyInCart({{ $product->id }}) > 0 ? '!border-emerald-500/70 !bg-emerald-500/10 ring-1 ring-emerald-500/30' : ''">
 
-                                @if ($imageUrl = $product->imageUrl())
-                                    <img src="{{ $imageUrl }}" alt="" loading="lazy" class="w-full h-16 sm:h-20 object-cover rounded-lg bg-slate-800">
-                                @else
-                                    <span aria-hidden="true" class="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700/60 text-slate-300 text-sm font-bold flex items-center justify-center uppercase">{{ mb_substr($product->name, 0, 2) }}</span>
-                                @endif
+                                {{-- Image / Badge Container --}}
+                                <div class="relative w-full aspect-[4/3] rounded-lg overflow-hidden bg-slate-800 border border-slate-700/40">
+                                    @if ($imageUrl = $product->imageUrl())
+                                        <img src="{{ $imageUrl }}" alt="{{ $product->name }}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105">
+                                    @else
+                                        <div class="w-full h-full bg-slate-800 flex flex-col items-center justify-center p-2">
+                                            <span class="w-9 h-9 rounded-lg bg-slate-700/80 border border-slate-600/50 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center justify-center uppercase shadow-inner">
+                                                {{ mb_substr($product->name, 0, 2) }}
+                                            </span>
+                                            <span class="text-[9px] text-slate-400 mt-1 truncate max-w-full font-mono">{{ $product->sku ?: 'ITEM' }}</span>
+                                        </div>
+                                    @endif
 
-                                <span class="text-[13px] font-semibold text-slate-100 leading-snug line-clamp-2">{{ $product->name }}</span>
+                                    @if ($out)
+                                        <div class="absolute inset-0 bg-slate-950/80 backdrop-blur-[1px] flex items-center justify-center">
+                                            <span class="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider bg-rose-500 text-white shadow-sm">Habis</span>
+                                        </div>
+                                    @endif
 
-                                <span class="mt-auto flex items-end justify-between gap-1.5">
-                                    <span class="text-sm font-bold text-emerald-400 tabular-nums">{{ \App\Support\NumberFormatter::currency($product->price) }}</span>
+                                    {{-- Cart counter badge --}}
+                                    <div x-show="qtyInCart({{ $product->id }}) > 0" x-cloak
+                                        class="absolute top-1.5 right-1.5 min-w-[24px] h-6 px-1.5 rounded-full bg-emerald-500 text-white text-xs font-black shadow-md flex items-center justify-center tabular-nums ring-2 ring-slate-900">
+                                        <span x-text="quantity(qtyInCart({{ $product->id }}))"></span>
+                                    </div>
+                                </div>
+
+                                {{-- Product Name --}}
+                                <span class="text-xs sm:text-[13px] font-semibold text-slate-100 group-hover:text-emerald-600 dark:group-hover:text-white leading-snug line-clamp-2 min-h-[2rem]">
+                                    {{ $product->name }}
+                                </span>
+
+                                {{-- Price & Stock Footer --}}
+                                <span class="mt-auto flex items-end justify-between gap-1.5 pt-0.5 border-t border-slate-800/40">
+                                    <span class="text-sm sm:text-[15px] font-extrabold text-emerald-600 dark:text-emerald-400 tabular-nums tracking-tight">
+                                        {{ \App\Support\NumberFormatter::currency($product->price) }}
+                                    </span>
                                     @if ($product->track_stock)
                                         <span @class([
-                                            'text-[10px] font-semibold tabular-nums whitespace-nowrap',
-                                            'text-rose-400' => $out,
-                                            'text-amber-400' => $low,
-                                            'text-slate-400' => ! $out && ! $low,
+                                            'text-[10px] tabular-nums whitespace-nowrap',
+                                            'text-rose-400 font-bold' => $out,
+                                            'text-amber-400 font-bold px-1.5 py-0.2 rounded bg-amber-500/10 border border-amber-500/20' => $low,
+                                            'text-slate-400 font-medium' => ! $out && ! $low,
                                         ])>{{ $out ? 'Habis' : \App\Support\NumberFormatter::quantity($stock).' '.$product->unit }}</span>
                                     @endif
                                 </span>

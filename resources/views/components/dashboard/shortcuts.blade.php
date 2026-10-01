@@ -10,7 +10,7 @@
     <nav aria-label="{{ __('Pintasan') }}" class="grid grid-cols-1 gap-3 {{ [1 => '', 2 => 'sm:grid-cols-2'][count($links)] ?? 'sm:grid-cols-3' }}">
         @foreach ($links as $link)
             <a href="{{ $link['href'] }}" wire:navigate
-                class="group bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/80 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-colors flex items-center gap-3 min-h-[44px] shadow-sm dark:shadow-none focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
+                class="group bg-white dark:bg-slate-900 hover:bg-slate-800/60 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-colors flex items-center gap-3 min-h-[44px] shadow-sm dark:shadow-none focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
                 <div class="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700/50 shrink-0">
                     <i data-lucide="{{ $link['icon'] }}" class="w-4 h-4"></i>
                 </div>

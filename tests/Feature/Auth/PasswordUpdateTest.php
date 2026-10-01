@@ -8,6 +8,7 @@ use Livewire\Volt\Volt;
 
 test('password can be updated', function () {
     $user = User::factory()->create();
+    $user->createToken('hp');
 
     $this->actingAs($user);
 
@@ -22,6 +23,7 @@ test('password can be updated', function () {
         ->assertNoRedirect();
 
     $this->assertTrue(Hash::check('new-password', $user->refresh()->password));
+    expect($user->tokens()->count())->toBe(0);
 });
 
 test('correct password must be provided to update password', function () {

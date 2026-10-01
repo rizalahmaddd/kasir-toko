@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Customer;
+use App\Models\Sale;
 use App\Models\User;
 use App\Support\Features;
 use Laravel\Sanctum\Sanctum;
@@ -71,4 +72,14 @@ it('closes endpoints of a disabled feature', function () {
     $this->getJson('/api/v1/master-data/customers')
         ->assertForbidden()
         ->assertJsonPath('message', 'Fitur ini sedang dinonaktifkan.');
+});
+
+it('refuses to delete a customer who still owes money', function () {
+    apiActingAs('admin');
+    $customer = Customer::factory()->create();
+    Sale::factory()->create(['customer_id' => $customer->id, 'due_amount' => 30000]);
+
+    $this->deleteJson("/api/v1/master-data/customers/{$customer->id}")
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['message' => 'Pelanggan ini masih punya kasbon Rp30.000 yang belum lunas. Lunasi dulu sebelum menghapus.']);
 });

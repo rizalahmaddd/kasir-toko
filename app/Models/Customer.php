@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Events\CustomerChanged;
 use App\Listeners\NotifyOfNewCustomer;
 use App\Models\Concerns\Auditable;
+use App\Support\NumberFormatter;
 use Database\Factories\CustomerFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -57,6 +58,18 @@ class Customer extends Model
     public function outstandingBalance(): int
     {
         return (int) $this->sales()->completed()->sum('due_amount');
+    }
+
+    /**
+     * Deleting a customer who still owes money would leave the debt with nobody to collect from.
+     */
+    public function deletionBlockedReason(): ?string
+    {
+        $due = $this->outstandingBalance();
+
+        return $due > 0
+            ? 'Pelanggan ini masih punya kasbon '.NumberFormatter::currency($due).' yang belum lunas. Lunasi dulu sebelum menghapus.'
+            : null;
     }
 
     protected function casts(): array

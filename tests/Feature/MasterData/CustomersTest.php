@@ -2,6 +2,7 @@
 
 use App\Livewire\MasterData\Customers;
 use App\Models\Customer;
+use App\Models\Sale;
 use Livewire\Livewire;
 
 test('guests cannot view the customers page', function () {
@@ -54,4 +55,17 @@ test('read-only roles cannot manage customers', function () {
     Livewire::test(Customers::class)
         ->call('openCreateModal')
         ->assertForbidden();
+});
+
+test('a customer with unpaid credit cannot be deleted', function () {
+    actingAsAdmin();
+    $customer = Customer::factory()->create();
+    Sale::factory()->create(['customer_id' => $customer->id, 'total' => 50000, 'paid_amount' => 20000, 'due_amount' => 30000]);
+
+    Livewire::test(Customers::class)
+        ->call('confirmDelete', $customer->id)
+        ->call('delete')
+        ->assertDispatched('notify', type: 'error');
+
+    expect($customer->fresh()->trashed())->toBeFalse();
 });

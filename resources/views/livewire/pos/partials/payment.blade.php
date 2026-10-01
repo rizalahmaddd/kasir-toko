@@ -32,14 +32,19 @@
                             <dd class="tabular-nums text-slate-200 font-semibold" x-text="rupiah(payTotal)"></dd>
                         </div>
                         <div x-show="payShortfall > 0" class="flex justify-between">
-                            <dt class="text-amber-400" x-text="pay.credit ? 'Dicatat kasbon' : 'Kurang'"></dt>
+                            <dt class="text-amber-400 font-semibold" x-text="pay.credit ? 'Dicatat kasbon' : 'Kurang'"></dt>
                             <dd class="tabular-nums font-bold text-amber-400" x-text="rupiah(payShortfall)"></dd>
                         </div>
-                        <div class="flex justify-between items-baseline pt-2 border-t border-slate-800">
-                            <dt class="text-slate-300 font-semibold">Kembalian</dt>
-                            <dd class="tabular-nums text-2xl sm:text-3xl font-extrabold" :class="payChange > 0 ? 'text-emerald-400' : 'text-slate-500'" x-text="rupiah(payChange)"></dd>
-                        </div>
                     </dl>
+
+                    {{-- Kotak Kembalian Kasir --}}
+                    <div class="p-3 sm:p-4 rounded-xl border transition-colors shadow-inner"
+                        :class="payChange > 0 ? 'bg-emerald-500/10 border-emerald-500/40' : 'bg-slate-900 border-slate-800'">
+                        <div class="flex justify-between items-baseline">
+                            <span class="text-xs font-bold uppercase tracking-wider" :class="payChange > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'">Kembalian</span>
+                            <span class="tabular-nums text-2xl sm:text-3xl font-black tracking-tight" :class="payChange > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500'" x-text="rupiah(payChange)"></span>
+                        </div>
+                    </div>
 
                     <div x-show="config.allowCredit && payShortfall > 0" class="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
                         <label class="flex items-start gap-3 cursor-pointer">
@@ -58,8 +63,8 @@
                     <div class="grid gap-1.5" :class="config.methods.length > 2 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2'" role="group" aria-label="Metode pembayaran">
                         <template x-for="method in config.methods" :key="method.value">
                             <button type="button" @click="selectMethod(method.value)" :aria-pressed="pay.method === method.value"
-                                class="flex flex-col items-center justify-center gap-1 min-h-[56px] rounded-xl border text-xs font-semibold transition"
-                                :class="pay.method === method.value ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400' : 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700'">
+                                class="flex flex-col items-center justify-center gap-1 min-h-[56px] rounded-xl border text-xs font-semibold transition active:scale-95 cursor-pointer shadow-sm"
+                                :class="pay.method === method.value ? 'border-emerald-500/60 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-500/30' : 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700'">
                                 <i :data-lucide="method.icon" class="w-5 h-5"></i>
                                 <span x-text="method.label"></span>
                             </button>
@@ -77,7 +82,7 @@
                                 @input="pay.amount = $event.target.value.replace(/\D/g, '').slice(0, 12); $event.target.value = pay.amount === '' ? '' : quantity(pay.amount)"
                                 x-init="$nextTick(() => window.matchMedia('(pointer: coarse)').matches || $el.focus())"
                                 placeholder="0"
-                                class="w-full h-16 bg-slate-950 border border-slate-800 rounded-xl pl-12 pr-4 text-right text-3xl font-extrabold text-slate-50 tabular-nums placeholder:text-slate-600 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500">
+                                class="w-full h-16 bg-slate-950 border border-slate-800 rounded-xl pl-12 pr-4 text-right text-3xl font-extrabold text-slate-50 tabular-nums placeholder:text-slate-600 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition shadow-inner">
                         </div>
                     </div>
 
@@ -110,13 +115,16 @@
                         <x-text-input id="pos-pay-ref" x-model="pay.reference" maxlength="100" class="w-full" placeholder="Mis. 4 digit akhir kartu atau ID transaksi" />
                     </div>
 
-                    <div x-show="pay.method === 'cash' && cashSuggestions.length" class="grid grid-cols-3 gap-1.5">
-                        <template x-for="(value, index) in cashSuggestions" :key="value">
-                            <button type="button" @click="setAmount(value)"
-                                class="min-h-[44px] rounded-lg border text-xs font-bold tabular-nums transition"
-                                :class="payCurrent === value ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400' : 'border-slate-800 bg-slate-900 text-slate-200 hover:border-slate-700'"
-                                x-text="index === 0 ? 'Uang pas' : rupiah(value)"></button>
-                        </template>
+                    <div x-show="pay.method === 'cash' && cashSuggestions.length" class="space-y-1.5">
+                        <span class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400">Pilihan Pecahan Uang</span>
+                        <div class="grid grid-cols-3 gap-2">
+                            <template x-for="(value, index) in cashSuggestions" :key="value">
+                                <button type="button" @click="setAmount(value)"
+                                    class="min-h-[44px] rounded-xl border text-xs font-bold tabular-nums transition-all active:scale-95 shadow-sm cursor-pointer flex items-center justify-center p-1.5"
+                                    :class="payCurrent === value ? 'border-emerald-500 bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 ring-1 ring-emerald-500/40' : (index === 0 ? 'border-emerald-500/40 bg-slate-900 text-emerald-600 dark:text-emerald-400 hover:bg-slate-800' : 'border-slate-800 bg-slate-900 text-slate-200 hover:border-slate-700 hover:bg-slate-800')"
+                                    x-text="index === 0 ? 'Uang Pas' : rupiah(value)"></button>
+                            </template>
+                        </div>
                     </div>
 
                     <div class="grid grid-cols-3 gap-1.5 [@media(pointer:fine)]:hidden" aria-label="Papan angka">

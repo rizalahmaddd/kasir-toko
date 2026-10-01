@@ -24,7 +24,7 @@
     <{{ $tag }} @if ($href) href="{{ $href }}" wire:navigate @endif
         @class([
             'py-2.5 flex items-center justify-between gap-3 text-xs',
-            '-mx-2 px-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors min-h-[44px] focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500' => $href,
+            '-mx-2 px-2 rounded-lg hover:bg-slate-800/60 transition-colors min-h-[44px] focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500' => $href,
         ])>
         <div class="min-w-0">
             <div class="font-semibold text-slate-800 dark:text-slate-200 truncate">{{ $title }}</div>

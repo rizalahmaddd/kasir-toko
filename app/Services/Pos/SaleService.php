@@ -272,12 +272,13 @@ class SaleService
     }
 
     /**
-     * @param  array<string, mixed>  $payload
+     * Shared with the API CheckoutRequest so both entry points accept exactly the same cart.
+     *
      * @return array<string, mixed>
      */
-    private function validateCheckout(array $payload): array
+    public static function checkoutRules(): array
     {
-        $validator = Validator::make($payload, [
+        return [
             'client_uuid' => ['required', 'uuid'],
             'customer_id' => ['nullable', 'integer', Rule::exists('customers', 'id')->whereNull('deleted_at')],
             'items' => ['required', 'array', 'min:1', 'max:300'],
@@ -294,12 +295,29 @@ class SaleService
             'payments.*.reference' => ['nullable', 'string', 'max:100'],
             'note' => ['nullable', 'string', 'max:255'],
             'expected_total' => ['nullable', 'integer'],
-        ], [
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function checkoutMessages(): array
+    {
+        return [
             'items.required' => 'Keranjang masih kosong.',
             'items.min' => 'Keranjang masih kosong.',
             'items.*.quantity.gt' => 'Jumlah barang harus lebih dari 0.',
             'customer_id.exists' => 'Pelanggan yang dipilih sudah dihapus.',
-        ]);
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function validateCheckout(array $payload): array
+    {
+        $validator = Validator::make($payload, self::checkoutRules(), self::checkoutMessages());
 
         if ($validator->fails()) {
             throw new PosException($validator->errors()->first(), 'validation');

@@ -405,6 +405,15 @@ class OpenApiGenerator
                         'additionalProperties' => ['type' => 'array', 'items' => ['type' => 'string']],
                         'examples' => [['quantity' => ['Jumlah wajib diisi.']]],
                     ],
+                    'reason' => [
+                        'type' => 'string',
+                        'description' => 'Hanya pada penolakan transaksi kasir/stok/shift: kode yang stabil untuk ditangani aplikasi (mis. `no_shift`, `price_changed`, `insufficient_stock`).',
+                        'examples' => ['insufficient_stock'],
+                    ],
+                    'context' => [
+                        'type' => 'object',
+                        'description' => 'Data pendukung `reason`, mis. `prices` (harga terbaru per ID produk) atau `stock`.',
+                    ],
                 ],
                 'required' => ['message', 'errors'],
             ],
@@ -462,11 +471,13 @@ class OpenApiGenerator
 
         **Hak akses** mengikuti peran & izin yang sama dengan aplikasi web. `GET /api/v1/auth/me` mengembalikan peran, izin, dan fitur yang aktif agar aplikasi bisa menyembunyikan menu yang tidak boleh diakses.
 
-        **Format**: nominal uang dan kuantitas dikirim sebagai string desimal (mis. `"1250.50"`) supaya tidak kehilangan presisi. Tanggal `YYYY-MM-DD`, waktu ISO 8601. Daftar memakai paginasi `page` & `per_page` dengan `links` dan `meta`.
+        **Format**: nominal uang dalam rupiah bulat (integer, tanpa desimal). Kuantitas dan stok dikirim sebagai string desimal (mis. `"1.500"`) supaya tidak kehilangan presisi. Tanggal `YYYY-MM-DD`, waktu ISO 8601. Daftar memakai paginasi `page` & `per_page` dengan `links` dan `meta`.
 
-        **Error**: `401` token tidak valid, `403` tidak berwenang / fitur dimatikan, `404` data tidak ada, `422` validasi atau aturan bisnis (pesan di `message` dan `errors`), `429` terlalu banyak request (120/menit per akun, login & OTP 10/menit).
+        **Alur kasir**: `GET /api/v1/pos/config` → `GET /api/v1/pos/shift` (buka dengan `POST` bila `shift` null) → katalog `GET /api/v1/pos/products` / scan `GET /api/v1/pos/products/lookup` → `POST /api/v1/pos/checkout` dengan `client_uuid` unik → struk `GET /api/v1/sales/{sale}/receipt`. Checkout aman diulang dengan `client_uuid` yang sama saat koneksi putus.
 
-        **Aksi yang tersedia**: respons detail dokumen menyertakan `abilities` (mis. `approve`, `cancel`, `receive`) yang sudah memperhitungkan peran dan status dokumen, jadi aplikasi cukup menampilkan tombol yang bernilai `true`.
+        **Error**: `401` token tidak valid, `403` tidak berwenang / fitur dimatikan, `404` data tidak ada, `422` validasi atau aturan bisnis (pesan di `message` dan `errors`; penolakan kasir juga membawa `reason` & `context`), `429` terlalu banyak request (120/menit per akun, login & OTP 10/menit).
+
+        **Aksi yang tersedia**: respons detail transaksi dan shift menyertakan `abilities` (mis. `void`, `collect_payment`, `close`) yang sudah memperhitungkan peran dan status data, jadi aplikasi cukup menampilkan tombol yang bernilai `true`.
 
         **Realtime (opsional)**: event yang sama dengan web disiarkan lewat Reverb (protokol Pusher). Otorisasi channel privat memakai `POST /api/broadcasting/auth` dengan header Bearer. Channel: `private-App.Models.User.{id}` (notifikasi) dan `private-dashboard` (perubahan dokumen).
 

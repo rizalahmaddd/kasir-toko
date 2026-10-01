@@ -39,7 +39,7 @@
             <button
                 type="button"
                 onclick="window.print()"
-                class="inline-flex items-center gap-1.5 h-10 sm:h-[38px] px-3 text-xs font-semibold rounded-lg border border-slate-700/80 hover:border-slate-600 bg-slate-900 hover:bg-slate-850 text-slate-200 hover:text-white transition shadow-sm cursor-pointer"
+                class="inline-flex items-center gap-1.5 h-10 sm:h-[38px] px-3 text-xs font-semibold rounded-lg border border-slate-700/80 hover:border-slate-600 bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white transition shadow-sm cursor-pointer"
                 title="Cetak ringkasan halaman laporan ini"
             >
                 <i data-lucide="printer" class="w-3.5 h-3.5 text-slate-400"></i>
@@ -114,13 +114,13 @@
                 </div>
                 <p @class([
                     'text-2xl sm:text-3xl font-extrabold tabular-nums tracking-tight mt-1.5',
-                    'text-emerald-400' => $totals['profit'] >= 0,
-                    'text-rose-400' => $totals['profit'] < 0,
+                    'text-emerald-600 dark:text-emerald-400' => $totals['profit'] >= 0,
+                    'text-rose-600 dark:text-rose-400' => $totals['profit'] < 0,
                 ])>
                     {{ Num::currency($totals['profit']) }}
                 </p>
                 <p class="text-xs text-slate-400 mt-1.5 leading-relaxed">
-                    Margin <strong class="text-emerald-400">{{ Num::quantity($totals['margin']) }}%</strong> · HPP Modal <strong class="text-slate-300">{{ Num::currency($totals['cogs']) }}</strong>
+                    Margin <strong class="text-emerald-600 dark:text-emerald-400">{{ Num::quantity($totals['margin']) }}%</strong> · HPP Modal <strong class="text-slate-300">{{ Num::currency($totals['cogs']) }}</strong>
                 </p>
             </div>
 
@@ -128,7 +128,7 @@
             <div class="pt-3 sm:pt-0">
                 <div class="flex items-center justify-between">
                     <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Realisasi Kas Diterima</p>
-                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Uang Masuk</span>
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">Uang Masuk</span>
                 </div>
                 <p class="text-2xl sm:text-3xl font-extrabold text-slate-100 tabular-nums tracking-tight mt-1.5">
                     {{ Num::currency($totals['paid']) }}
@@ -248,18 +248,18 @@
                 @else
                     <div class="space-y-4">
                         @if ($peakHour && $peakHour['count'] > 0)
-                            <div class="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded-xl flex items-center justify-between gap-3">
+                            <div class="p-3 bg-emerald-500/10 border border-emerald-500/25 rounded-xl flex items-center justify-between gap-3">
                                 <div class="flex items-center gap-2.5">
-                                    <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                                    <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
                                         <i data-lucide="flame" class="w-4 h-4"></i>
                                     </div>
                                     <div>
-                                        <p class="text-[11px] text-emerald-300 font-semibold uppercase tracking-wider">Jam Tersibuk</p>
+                                        <p class="text-[11px] text-emerald-700 dark:text-emerald-300 font-semibold uppercase tracking-wider">Jam Tersibuk</p>
                                         <p class="text-sm font-bold text-slate-100">{{ $peakHour['label'] }} – {{ sprintf('%02d:00', (int)$peakHour['hour'] + 1) }}</p>
                                     </div>
                                 </div>
                                 <div class="text-right">
-                                    <p class="text-xs font-bold text-emerald-400 tabular-nums">{{ $peakHour['count'] }} transaksi</p>
+                                    <p class="text-xs font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{{ $peakHour['count'] }} transaksi</p>
                                     <p class="text-[10px] text-slate-400 tabular-nums">{{ Num::currency($peakHour['revenue']) }}</p>
                                 </div>
                             </div>
@@ -546,15 +546,15 @@
                     {{-- Baris Total Keseluruhan --}}
                     <tfoot>
                         <tr class="bg-slate-900 border-t-2 border-slate-700/80 font-bold text-xs text-slate-100">
-                            <td class="px-4 py-3.5 text-emerald-400 uppercase tracking-wider">TOTAL KESELURUHAN</td>
+                            <td class="px-4 py-3.5 text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">TOTAL KESELURUHAN</td>
                             <td class="px-4 py-3.5 text-right tabular-nums text-slate-100">{{ Num::quantity($dailySummary['count']) }}</td>
                             <td class="px-4 py-3.5 text-right tabular-nums text-slate-100">{{ Num::quantity($dailySummary['qty']) }}</td>
                             <td class="px-4 py-3.5 text-right tabular-nums text-slate-300">{{ Num::currency($dailySummary['discount']) }}</td>
                             <td class="px-4 py-3.5 text-right tabular-nums text-slate-300">{{ Num::currency($dailySummary['tax']) }}</td>
                             <td class="px-4 py-3.5 text-right tabular-nums text-slate-300">{{ Num::currency($dailySummary['cogs']) }}</td>
-                            <td class="px-4 py-3.5 text-right tabular-nums text-emerald-400 text-sm font-extrabold">{{ Num::currency($dailySummary['profit']) }}</td>
-                            <td class="px-4 py-3.5 text-right tabular-nums text-emerald-400">{{ Num::quantity($dailySummary['margin']) }}%</td>
-                            <td class="px-4 py-3.5 text-right tabular-nums text-emerald-400 text-sm font-extrabold">{{ Num::currency($dailySummary['total']) }}</td>
+                            <td class="px-4 py-3.5 text-right tabular-nums text-emerald-600 dark:text-emerald-400 text-sm font-extrabold">{{ Num::currency($dailySummary['profit']) }}</td>
+                            <td class="px-4 py-3.5 text-right tabular-nums text-emerald-600 dark:text-emerald-400">{{ Num::quantity($dailySummary['margin']) }}%</td>
+                            <td class="px-4 py-3.5 text-right tabular-nums text-emerald-600 dark:text-emerald-400 text-sm font-extrabold">{{ Num::currency($dailySummary['total']) }}</td>
                         </tr>
                     </tfoot>
                 </x-table>
@@ -607,7 +607,7 @@
                                     <button
                                         type="button"
                                         wire:click="openSaleModal({{ $sale->id }})"
-                                        class="font-mono font-bold text-emerald-400 hover:text-emerald-300 hover:underline cursor-pointer"
+                                        class="font-mono font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:underline cursor-pointer"
                                         title="Buka rincian lengkap transaksi"
                                     >
                                         {{ $sale->number }}
@@ -642,7 +642,7 @@
                                     @if ($sale->isVoided())
                                         <span class="text-slate-500 text-xs">-</span>
                                     @else
-                                        <span @class(['font-semibold text-xs', 'text-emerald-400' => $saleProfit >= 0, 'text-rose-400' => $saleProfit < 0])>
+                                        <span @class(['font-semibold text-xs', 'text-emerald-600 dark:text-emerald-400' => $saleProfit >= 0, 'text-rose-600 dark:text-rose-400' => $saleProfit < 0])>
                                             {{ Num::currency($saleProfit) }}
                                         </span>
                                     @endif
@@ -777,13 +777,13 @@
                     {{-- Footer Total Analisis Produk --}}
                     <tfoot>
                         <tr class="bg-slate-900 border-t-2 border-slate-700/80 font-bold text-xs text-slate-100">
-                            <td colspan="2" class="px-4 py-3.5 text-emerald-400 uppercase tracking-wider">TOTAL SELURUH PRODUK</td>
+                            <td colspan="2" class="px-4 py-3.5 text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">TOTAL SELURUH PRODUK</td>
                             <td class="px-4 py-3.5 text-right tabular-nums text-slate-100">{{ Num::quantity($productsSummary['qty']) }}</td>
                             <td class="px-4 py-3.5 text-right text-slate-400">-</td>
-                            <td class="px-4 py-3.5 text-right tabular-nums text-emerald-400 text-sm font-extrabold">{{ Num::currency($productsSummary['revenue']) }}</td>
+                            <td class="px-4 py-3.5 text-right tabular-nums text-emerald-600 dark:text-emerald-400 text-sm font-extrabold">{{ Num::currency($productsSummary['revenue']) }}</td>
                             <td class="px-4 py-3.5 text-right tabular-nums text-slate-300">{{ Num::currency($productsSummary['cogs']) }}</td>
-                            <td class="px-4 py-3.5 text-right tabular-nums text-emerald-400 text-sm font-extrabold">{{ Num::currency($productsSummary['profit']) }}</td>
-                            <td class="px-4 py-3.5 text-right tabular-nums text-emerald-400">{{ Num::quantity($productsSummary['margin']) }}%</td>
+                            <td class="px-4 py-3.5 text-right tabular-nums text-emerald-600 dark:text-emerald-400 text-sm font-extrabold">{{ Num::currency($productsSummary['profit']) }}</td>
+                            <td class="px-4 py-3.5 text-right tabular-nums text-emerald-600 dark:text-emerald-400">{{ Num::quantity($productsSummary['margin']) }}%</td>
                             <td class="px-4 py-3.5 text-right tabular-nums text-slate-100">100%</td>
                         </tr>
                     </tfoot>

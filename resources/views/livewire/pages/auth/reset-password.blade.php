@@ -50,6 +50,9 @@ new #[Layout('layouts.guest')] class extends Component
                     'remember_token' => Str::random(60),
                 ])->save();
 
+                // A reset usually means the password leaked or a phone went missing, so mobile sessions end too.
+                $user->tokens()->delete();
+
                 event(new PasswordReset($user));
             }
         );

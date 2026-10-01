@@ -160,10 +160,14 @@ html.light .text-slate-500 {
 }
 
 /* Light mode surface clarity overrides */
-html.light .bg-slate-100 {
+html.light .bg-slate-100,
+html.light [class*="hover:bg-slate-100"]:hover,
+html.light .hover\:bg-slate-100:hover {
     background-color: #f1f5f9 !important;
 }
-html.light .bg-slate-50 {
+html.light .bg-slate-50,
+html.light [class*="hover:bg-slate-50"]:hover,
+html.light .hover\:bg-slate-50:hover {
     background-color: #f8fafc !important;
 }
 html.light .border-slate-200 {
@@ -184,8 +188,12 @@ html.light .bg-slate-900\/95 {
 html.light .text-white:not(
     button,
     button *,
+    a,
+    a *,
     [class*="bg-emerald-"],
     [class*="bg-emerald-"] *,
+    [class*="from-emerald-"],
+    [class*="from-emerald-"] *,
     [class*="bg-rose-"],
     [class*="bg-rose-"] *,
     [class*="bg-amber-"],

@@ -21,6 +21,8 @@ class NotificationResource extends JsonResource
      */
     private const TARGETS = [
         'master-data.customers.show' => 'customer',
+        'sales.show' => 'sale',
+        'shifts.show' => 'shift',
     ];
 
     /**

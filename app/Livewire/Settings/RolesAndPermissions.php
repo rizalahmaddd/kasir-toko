@@ -7,7 +7,9 @@ use App\Policies\RolePolicy;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -67,12 +69,25 @@ class RolesAndPermissions extends Component
 
     public array $editingUserRoles = [];
 
+    public string $newUserName = '';
+
+    public string $newUserUsername = '';
+
+    public string $newUserEmail = '';
+
+    public string $newUserPhone = '';
+
+    public string $newUserPassword = '';
+
+    /** @var list<string> */
+    public array $newUserRoles = [];
+
     public function mount(): void
     {
-        abort_unless(Auth::user()->can('viewAny', Role::class), 403);
+        abort_unless(Auth::user()->can('open', Role::class), 403);
 
-        if (! in_array($this->tab, self::TABS, true)) {
-            $this->tab = 'roles';
+        if (! in_array($this->tab, $this->availableTabs(), true)) {
+            $this->tab = $this->availableTabs()[0];
         }
 
         $roles = Role::orderByRaw("CASE WHEN LOWER(name) = 'superadmin' THEN 0 ELSE 1 END")
@@ -89,7 +104,19 @@ class RolesAndPermissions extends Component
 
     public function updatedTab(): void
     {
+        if (! in_array($this->tab, $this->availableTabs(), true)) {
+            $this->tab = $this->availableTabs()[0];
+        }
+
         $this->resetPage();
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function availableTabs(): array
+    {
+        return Auth::user()->can('viewAny', Role::class) ? self::TABS : ['users'];
     }
 
     public function updatedUserSearch(): void
@@ -461,6 +488,13 @@ class RolesAndPermissions extends Component
         abort_unless(Auth::user()->can('manageUserRoles', Role::class), 403);
 
         $user = User::findOrFail($userId);
+
+        if ($user->hasRole('superadmin') && ! Auth::user()->can('assignSuperadmin', Role::class)) {
+            $this->dispatch('notify', message: 'Peran akun Superadmin hanya bisa diubah oleh Superadmin.', type: 'error');
+
+            return;
+        }
+
         $this->editingUserId = $user->id;
         $this->editingUserRoles = $user->roles()->pluck('name')->all();
         $this->showUserRolesModal = true;
@@ -472,6 +506,18 @@ class RolesAndPermissions extends Component
         abort_unless(Auth::user()->can('manageUserRoles', Role::class), 403);
 
         $user = User::findOrFail($this->editingUserId);
+        $this->validate(
+            ['editingUserRoles.*' => ['string', Rule::exists('roles', 'name')]],
+            ['editingUserRoles.*.exists' => 'Peran yang dipilih tidak dikenal.'],
+        );
+
+        $touchesSuperadmin = $user->hasRole('superadmin') || in_array('superadmin', $this->editingUserRoles, true);
+
+        if ($touchesSuperadmin && ! Auth::user()->can('assignSuperadmin', Role::class)) {
+            $this->dispatch('notify', message: 'Peran Superadmin hanya bisa diberikan atau dicabut oleh Superadmin.', type: 'error');
+
+            return;
+        }
 
         // Security safeguard: Pastikan tidak menghapus akun superadmin terakhir
         if ($user->hasRole('superadmin') && ! in_array('superadmin', $this->editingUserRoles, true)) {
@@ -500,6 +546,102 @@ class RolesAndPermissions extends Component
 
         $this->dispatch('close-modal', 'user-roles');
         $this->dispatch('notify', message: "Penugasan peran untuk {$user->name} berhasil disimpan.");
+    }
+
+    public function openCreateUserModal(): void
+    {
+        abort_unless(Auth::user()->can('manageUserRoles', Role::class), 403);
+
+        $this->reset('newUserName', 'newUserUsername', 'newUserEmail', 'newUserPhone', 'newUserPassword', 'newUserRoles');
+        $this->resetValidation();
+        $this->dispatch('open-modal', 'create-user');
+    }
+
+    public function closeCreateUserModal(): void
+    {
+        $this->reset('newUserPassword');
+        $this->resetValidation();
+    }
+
+    public function createUser(): void
+    {
+        abort_unless(Auth::user()->can('manageUserRoles', Role::class), 403);
+
+        $this->newUserUsername = strtolower(trim($this->newUserUsername));
+        $this->newUserEmail = strtolower(trim($this->newUserEmail));
+        $this->newUserPhone = filled($this->newUserPhone) ? User::normalizePhone($this->newUserPhone) : '';
+
+        $validated = $this->validate([
+            'newUserName' => ['required', 'string', 'max:255'],
+            'newUserUsername' => User::usernameRules(),
+            'newUserEmail' => ['required', 'string', 'email', 'max:255', Rule::unique(User::class, 'email')],
+            'newUserPhone' => User::phoneRules(),
+            'newUserPassword' => ['required', 'string', Password::defaults()],
+            'newUserRoles' => ['required', 'array', 'min:1'],
+            'newUserRoles.*' => ['string', Rule::exists('roles', 'name')],
+        ], [
+            ...collect(User::identityValidationMessages())->mapWithKeys(fn (string $message, string $key) => ['newUser'.ucfirst($key) => $message])->all(),
+            'newUserRoles.required' => 'Pilih minimal satu peran supaya akun ini bisa dipakai.',
+        ], [
+            'newUserName' => 'nama',
+            'newUserUsername' => 'username',
+            'newUserEmail' => 'email',
+            'newUserPhone' => 'nomor HP',
+            'newUserPassword' => 'password',
+        ]);
+
+        if (in_array('superadmin', $validated['newUserRoles'], true) && ! Auth::user()->can('assignSuperadmin', Role::class)) {
+            $this->addError('newUserRoles', 'Peran Superadmin hanya bisa diberikan oleh Superadmin.');
+
+            return;
+        }
+
+        $user = User::create([
+            'name' => $validated['newUserName'],
+            'username' => $validated['newUserUsername'],
+            'email' => $validated['newUserEmail'],
+            'phone' => $validated['newUserPhone'] ?: null,
+            'password' => Hash::make($validated['newUserPassword']),
+        ]);
+        $user->syncRoles($validated['newUserRoles']);
+
+        activity('roles')
+            ->causedBy(Auth::user())
+            ->performedOn($user)
+            ->event('created')
+            ->withProperties(['roles' => $validated['newUserRoles']])
+            ->log("Akun pengguna '{$user->name}' dibuat dengan peran: ".implode(', ', $validated['newUserRoles']));
+
+        $this->reset('newUserName', 'newUserUsername', 'newUserEmail', 'newUserPhone', 'newUserPassword', 'newUserRoles');
+        $this->dispatch('close-modal', 'create-user');
+        $this->dispatch('notify', message: "Akun {$user->name} dibuat. Sampaikan username dan password-nya ke pengguna.");
+    }
+
+    /**
+     * Mengeluarkan akun dari aplikasi mobile di semua perangkat, mis. HP kasir hilang atau pegawai keluar.
+     */
+    public function revokeUserTokens(int $userId): void
+    {
+        abort_unless(Auth::user()->can('manageUserRoles', Role::class), 403);
+
+        $user = User::findOrFail($userId);
+
+        if ($user->hasRole('superadmin') && ! Auth::user()->can('assignSuperadmin', Role::class)) {
+            $this->dispatch('notify', message: 'Perangkat akun Superadmin hanya bisa dikeluarkan oleh Superadmin.', type: 'error');
+
+            return;
+        }
+
+        $count = $user->tokens()->delete();
+
+        activity('roles')
+            ->causedBy(Auth::user())
+            ->performedOn($user)
+            ->event('updated')
+            ->withProperties(['revoked_tokens' => $count])
+            ->log("Akun '{$user->name}' dikeluarkan dari {$count} perangkat mobile.");
+
+        $this->dispatch('notify', message: "{$user->name} dikeluarkan dari {$count} perangkat mobile.");
     }
 
     /**
@@ -562,6 +704,7 @@ class RolesAndPermissions extends Component
         }
 
         $users = User::with('roles')
+            ->withCount('tokens')
             ->when($this->userSearch, function (Builder $q) {
                 $s = mb_strtolower($this->userSearch);
                 $q->where(fn (Builder $sq) => $sq->where('name', 'like', "%{$s}%")
@@ -585,6 +728,7 @@ class RolesAndPermissions extends Component
             'editingUser' => $editingUser,
             'totalPermissionsCount' => Permission::count(),
             'totalUsersCount' => User::count(),
+            'availableTabs' => $this->availableTabs(),
         ]);
     }
 }

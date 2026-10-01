@@ -6,7 +6,7 @@
 
 <div x-data="{ open: false, format: 'xlsx' }" class="relative inline-block">
     <button type="button" @click="open = true"
-        {{ $attributes->merge(['class' => 'inline-flex items-center gap-1.5 h-11 sm:h-[38px] px-3.5 text-xs font-semibold rounded-lg border border-slate-700/80 hover:border-slate-600 bg-slate-900 hover:bg-slate-850 text-slate-200 hover:text-white transition shadow-sm cursor-pointer']) }}
+        {{ $attributes->merge(['class' => 'inline-flex items-center gap-1.5 h-11 sm:h-[38px] px-3.5 text-xs font-semibold rounded-lg border border-slate-700/80 hover:border-slate-600 bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white transition shadow-sm cursor-pointer']) }}
         title="Buka dialog ekspor untuk memilih format Excel, PDF, atau CSV">
         <i data-lucide="download" class="w-3.5 h-3.5 text-emerald-400"></i>
         <span>{{ $label }}</span>

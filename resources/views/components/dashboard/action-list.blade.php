@@ -25,7 +25,7 @@
             @foreach ($items as $item)
                 <li wire:key="action-{{ \Illuminate\Support\Str::slug($item['label']) }}">
                     <x-feature-link :href="$item['href']" wire:navigate
-                        class="-mx-2 px-2 py-2.5 min-h-[44px] rounded-lg flex items-center justify-between gap-3 text-xs hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
+                        class="-mx-2 px-2 py-2.5 min-h-[44px] rounded-lg flex items-center justify-between gap-3 text-xs hover:bg-slate-800/60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
                         <span class="min-w-0">
                             <span class="block font-semibold text-slate-800 dark:text-slate-200">{{ $item['label'] }}</span>
                             @if (! empty($item['hint']))

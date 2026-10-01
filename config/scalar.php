@@ -36,7 +36,7 @@ return [
     | the existing middleware. Or, you can simply stick with this list.
     |
     */
-    'middleware' => ['web'],
+    'middleware' => ['web', 'auth', 'can:view-api-docs'],
 
     /*
     |--------------------------------------------------------------------------

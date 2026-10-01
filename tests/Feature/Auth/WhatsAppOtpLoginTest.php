@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use App\Services\FonnteService;
+use App\Services\WhatsAppOtpService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Livewire\Volt\Volt;
@@ -218,4 +219,20 @@ test('fonnte returns error when token is blank', function () {
 
     expect($result['status'])->toBeFalse()
         ->and($result['message'])->toContain('FONNTE_TOKEN');
+});
+
+test('a new otp gets a fresh set of attempts after the previous one ran out', function () {
+    $user = User::factory()->create(['phone' => '081222333444']);
+    Http::fake(['https://api.fonnte.com/send' => Http::response(['status' => true], 200)]);
+    $otp = app(WhatsAppOtpService::class);
+
+    $otp->sendOtp('081222333444');
+    foreach (range(1, 5) as $attempt) {
+        rescue(fn () => $otp->verifyOtp($user->id, '000000'), report: false);
+    }
+
+    Cache::forget("wa_otp_cooldown_{$user->id}");
+    $otp->sendOtp('081222333444');
+
+    expect($otp->verifyOtp($user->id, '123456')->is($user))->toBeTrue();
 });

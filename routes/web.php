@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\OpenApiDocumentController;
 use App\Http\Controllers\BrandingLogoController;
 use App\Livewire\Dashboard;
 use Illuminate\Support\Facades\Route;
@@ -13,6 +14,12 @@ Route::get('branding/logo', BrandingLogoController::class)->name('branding.logo'
 Route::get('dashboard', Dashboard::class)
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
+
+// Rendered by Scalar at /docs/api. Lives on the web stack because the docs page fetches it with the
+// superadmin's session cookie; mobile developers can also export it with `php artisan api:docs`.
+Route::get('api/openapi.json', OpenApiDocumentController::class)
+    ->middleware(['auth', 'can:view-api-docs'])
+    ->name('api.openapi');
 
 Route::view('profile', 'profile')
     ->middleware(['auth'])
