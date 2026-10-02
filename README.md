@@ -2,6 +2,8 @@
 
 Aplikasi kasir berbasis web untuk toko, dirancang untuk tablet dan ponsel tapi tetap nyaman di laptop. Dibangun di atas [JagoDev Laravel Starter](https://github.com/rizalahmaddd/jagodev-laravel-starter), jadi auth, peran & izin, audit trail, sakelar fitur, backup, dan tema gelap/terang sudah tersedia.
 
+Aplikasi ini **multi-tenant (SaaS)**: banyak toko memakai satu instalasi dan satu database, masing-masing hanya melihat datanya sendiri. Toko baru bisa mendaftar sendiri, punya masa uji coba, dan dikelola dari panel Platform. Instalasi untuk satu toko saja tetap bisa: `app:install` membuat toko pertama tanpa batas waktu. Detailnya di bagian [Multi-tenant (SaaS)](#multi-tenant-saas).
+
 ## Fitur Utama
 
 - **Dashboard**: penjualan hari ini dibanding kemarin, status shift aktif/belum dibuka, tombol langsung ke layar kasir, ringkasan transaksi, laba kotor, stok menipis, kasbon, dan grafik penjualan 7 hari. Kasir hanya melihat penjualannya sendiri.
@@ -17,6 +19,7 @@ Aplikasi kasir berbasis web untuk toko, dirancang untuk tablet dan ponsel tapi t
 - **Produk, kategori, stok**: HPP, margin, barcode, foto, batas stok minimum, stok masuk (HPP rata-rata tertimbang), stok keluar, stok opname, kartu stok.
 - **Laporan penjualan**: omzet, laba kotor, produk terlaris, per kategori, per kasir, per metode pembayaran.
 - **Pengaturan kasir**: metode pembayaran aktif, pajak, izin kasbon, izin stok minus, isi & lebar struk, cetak otomatis.
+- **Ekspor data toko** (`/pengaturan/ekspor-data`): pemilik toko mengunduh seluruh data tokonya sebagai ZIP berisi CSV (produk, kategori, pelanggan, pengguna, transaksi beserta item & pembayaran, shift, kas masuk/keluar, mutasi stok, pengaturan), termasuk data yang sudah dihapus. Angka ditulis mentah supaya bisa diolah ulang atau dipakai untuk pindah aplikasi.
 
 ### Kasus yang sudah ditangani
 
@@ -34,13 +37,73 @@ Aplikasi kasir berbasis web untuk toko, dirancang untuk tablet dan ponsel tapi t
 | Lupa tutup shift | Peringatan di layar kasir dan dashboard pemilik |
 | Printer tidak tersedia | Struk bisa dikirim lewat WhatsApp atau dicetak ulang kapan saja |
 
+## Multi-tenant (SaaS)
+
+### Konsep
+
+| Istilah | Arti |
+|---|---|
+| Tenant / toko | Satu pelanggan layanan (tabel `tenants`). Semua data bisnis menempel ke toko lewat kolom `tenant_id`. |
+| Pemilik toko | Akun berperan `superadmin` di tokonya: semua menu toko, sakelar fitur, ekspor data. Peran ini tidak berlaku di toko lain. |
+| Admin platform | Akun tanpa toko (`users.tenant_id` kosong, `is_platform_admin`). Hanya bisa membuka panel Platform: daftar toko dan backup database. |
+| Paket | `trial`, `basic`, `pro` di `config/saas.php`, beserta batas jumlah pengguna dan produk (`null` = tanpa batas). |
+
+Username, email, dan nomor HP unik di seluruh layanan, jadi login tidak perlu kode toko. Kode/nama yang dipakai di dalam toko (SKU, barcode, kode pelanggan, nama kategori, nama peran, nomor transaksi & shift) cukup unik per toko, dan penomoran dokumen (`TRX-2026-0001`) berjalan sendiri-sendiri di tiap toko.
+
+### Alur toko
+
+1. **Daftar** di `/daftar` (web) atau `POST /api/v1/auth/register` (aplikasi mobile). Toko dibuat beserta peran bawaan (superadmin, admin, kasir, staff) dan akun pemiliknya, lalu langsung masuk. Masa uji coba diatur dengan `SAAS_TRIAL_DAYS` (default 14 hari).
+2. **Masa aktif** dihitung dari `trial_ends_at` untuk paket `trial` dan `subscription_ends_at` untuk paket berbayar; kosong berarti tanpa batas.
+3. **Toko diblokir** kalau dinonaktifkan admin platform atau masa aktifnya habis:
+   - web: semua halaman dialihkan ke `/langganan`, aksi Livewire di halaman yang masih terbuka ditolak `402`;
+   - API: `402` dengan `reason` (`tenant_suspended`, `trial_expired`, `subscription_expired`); `auth/me` dan logout tetap bisa dipakai supaya aplikasi bisa menampilkan statusnya.
+   Data toko tidak dihapus; begitu diaktifkan atau diperpanjang, toko langsung bisa dipakai lagi.
+4. **Batas paket** dicek saat menambah produk dan pengguna baru; data yang sudah ada tidak disentuh saat toko turun paket.
+
+Pembayaran langganan belum otomatis: admin platform mengubah paket dan masa aktif dari panel **Platform → Toko Pelanggan** (`/platform/toko`), termasuk tombol perpanjang 30 hari dan menonaktifkan toko.
+
+### Membuat admin platform
+
+```bash
+php artisan app:platform-admin
+# atau tanpa interaksi
+php artisan app:platform-admin --no-interaction --name="Pengelola" --email=ops@layanan.id --username=ops --password='rahasia-kuat'
+```
+
+### Cara isolasi data bekerja (untuk developer)
+
+| Bagian | Lokasi | Catatan |
+|---|---|---|
+| Tenant aktif per request/job | `app/Support/CurrentTenant.php` | Diisi `IdentifyTenant` dari user yang login (session web atau token Sanctum), ikut tersimpan di payload queue, dan sekaligus mengatur team id Spatie. `run($tenant, fn)` untuk console/seeder. |
+| Filter otomatis | trait `app/Models/Concerns/BelongsToTenant.php` + `app/Models/Scopes/TenantScope.php` | Semua query model dibatasi ke tenant aktif dan `tenant_id` diisi saat model dibuat. Tanpa tenant aktif (console, halaman tamu) scope tidak memfilter apa pun. |
+| Akses toko & status langganan | `app/Http/Middleware/EnsureTenantAccess.php` | Juga terdaftar sebagai persistent middleware Livewire. Akun tanpa toko hanya boleh membuka `platform.*`. |
+| Validasi unique/exists | `app/Support/TenantRule.php` | `Rule::unique()`/`Rule::exists()` bawaan tidak kena global scope; pakai `TenantRule` untuk tabel milik toko. |
+| Peran per toko | Spatie teams (`config/permission.php`, kolom `tenant_id`) | Model `Role` sengaja tanpa global scope karena cache izin Spatie memuat peran semua toko; query peran di halaman Peran & Perizinan difilter manual. |
+| Pengaturan | `app/Models/Setting.php` | Baris `tenant_id` kosong = nilai bawaan platform (mis. nama aplikasi di halaman login), ditimpa nilai milik toko. Cache per toko. |
+| Pembuatan toko | `app/Services/TenantProvisioner.php` | Dipakai pendaftaran, `app:install`, dan seeder. |
+| Realtime | channel `tenant.{id}.dashboard` | `BroadcastsToDashboard` dan `WithRealtimeRefresh` memakai channel toko aktif. |
+| File unggahan | `CurrentTenant::storagePath()` | Foto produk, logo, dan slide disimpan di `tenants/{id}/...`. |
+| Paket & batas | `config/saas.php`, `app/Support/PlanLimits.php`, `Tenant::blockedReason()` | |
+| Ekspor data toko | `app/Services/TenantDataExporter.php` | Menolak jalan tanpa tenant aktif. |
+
+Aturan yang wajib diikuti:
+
+- Query lewat `DB::table()` atau raw SQL **tidak** terfilter; tambahkan `where tenant_id` sendiri. Join antartabel aman selama dimulai dari model Eloquent (kolom `tenant_id` di scope ditulis lengkap dengan nama tabel).
+- Kode di console, job, atau route tamu yang menyentuh data toko harus mengaktifkan tenant dulu (`app(CurrentTenant::class)->run(...)`), kalau tidak query mengembalikan data semua toko.
+- Backup & restore mencakup database semua toko, jadi hanya tersedia untuk admin platform (`/platform/backup`).
+
+### Upgrade dari versi satu toko
+
+`php artisan migrate` memindahkan semua data yang ada ke satu toko baru (nama diambil dari profil perusahaan) dengan paket `pro` tanpa batas waktu, termasuk peran, penomoran dokumen, dan pengaturan. Setelah itu buat akun admin platform dengan `php artisan app:platform-admin`. Backup database dulu sebelum migrasi.
+
 ## Akun Demo
 
-`php artisan migrate:fresh --seed` membuat katalog toko contoh, riwayat penjualan 6 hari, logo toko contoh (dari `database/seeders/images/branding/`, bisa diganti di Pengaturan Perusahaan), gambar slideshow layar pelanggan, dan akun berikut (password `password`):
+`php artisan migrate:fresh --seed` membuat toko **Toko Demo** (paket Pro) berisi katalog contoh, riwayat penjualan 6 hari, logo toko contoh (dari `database/seeders/images/branding/`, bisa diganti di Pengaturan Perusahaan), gambar slideshow layar pelanggan, dan akun berikut (password `password`):
 
 | Peran | Login | Akses |
 |---|---|---|
-| Superadmin | `superadmin` | Semua, termasuk sakelar fitur & backup |
+| Admin platform | `platform` | Panel Platform: daftar toko, paket & masa aktif, backup database |
+| Superadmin (pemilik toko) | `superadmin` | Semua menu toko, termasuk sakelar fitur & ekspor data |
 | Admin (pemilik) | `admin` | Semua menu toko, laporan, pengaturan kasir |
 | Kasir | `kasir` | Layar kasir, shift sendiri, transaksi sendiri, pelunasan kasbon |
 | Staff (gudang) | `staff` | Lihat produk, kelola stok |
@@ -66,7 +129,7 @@ Laravel 13, PHP 8.5, Livewire 3 + Volt + Alpine.js, Tailwind CSS, Laravel Reverb
    composer run setup
    ```
 
-   Perintah ini menginstal dependency, membuat `.env` + `APP_KEY`, lalu menjalankan `php artisan app:install`. Installer ini menjalankan migrasi, membuat peran & izin, mengisi nama aplikasi/perusahaan, dan membuat akun superadmin pertama. Terakhir, aset frontend dibuild. Kalau pertanyaan installer tidak muncul (terminal non-interaktif), jalankan `php artisan app:install` sendiri setelahnya.
+   Perintah ini menginstal dependency, membuat `.env` + `APP_KEY`, lalu menjalankan `php artisan app:install`. Installer ini menjalankan migrasi, membuat toko pertama (paket Pro, tanpa batas waktu) beserta peran & izinnya, mengisi nama aplikasi/perusahaan, dan membuat akun superadmin toko tersebut. Terakhir, aset frontend dibuild. Kalau pertanyaan installer tidak muncul (terminal non-interaktif), jalankan `php artisan app:install` sendiri setelahnya.
 
 3. Jalankan server web, queue worker, scheduler, Vite, dan Reverb sekaligus:
 
@@ -85,6 +148,8 @@ php artisan app:install --no-interaction \
 ```
 
 Tambahkan `--demo` untuk mengisi pelanggan dan katalog produk contoh.
+
+Untuk layanan SaaS, buat juga akun admin platform dengan `php artisan app:platform-admin`. Toko berikutnya mendaftar sendiri di `/daftar`.
 
 Data demo untuk pengembangan: lihat bagian **Akun Demo** di atas. Jangan jalankan seeder demo di production; pakai `app:install`.
 
@@ -111,6 +176,8 @@ Data demo untuk pengembangan: lihat bagian **Akun Demo** di atas. Jangan jalanka
 | Layar pelanggan | `app/Http/Controllers/CustomerDisplayController.php`, `resources/views/display/show.blade.php`, `resources/js/customer-display.js`, pengaturan `app/Support/CustomerDisplaySettings.php` |
 | Struk thermal | `resources/views/print/receipt.blade.php`, layout `components/layouts/thermal.blade.php` |
 | Branding & kop surat | `app/Support/Branding.php`, `resources/views/components/print-letterhead.blade.php` |
+| Multi-tenant, paket, panel Platform | lihat [Cara isolasi data bekerja](#cara-isolasi-data-bekerja-untuk-developer); panel di `app/Livewire/Platform/Tenants.php`, route `routes/platform.php` |
+| Pendaftaran toko & halaman langganan | `resources/views/livewire/pages/auth/register.blade.php`, `resources/views/livewire/pages/subscription-inactive.blade.php` |
 
 ## Menambah Modul Baru
 
@@ -140,60 +207,46 @@ tests/Feature/MasterData/*, tests/Feature/Api/MasterDataApiTest.php
 
 Lalu daftarkan modulnya di beberapa registry:
 
-1. **Izin**: tambah grup di `PermissionSeeder::PERMISSION_GROUPS` dan isi `DEFAULT_ROLE_PERMISSIONS`. Halaman Peran & Perizinan membacanya otomatis.
-2. **Sakelar fitur**: tambah modul/fitur di `Features::MODULES` beserta pola nama route-nya. Route web yang tidak terdaftar selalu terbuka. Route API memakai middleware `feature:modul.fitur`.
-3. **Menu**: tambah entri di `Navigation::items()` dengan `route`, `icon`, `feature`, `can`, dan `keywords` untuk pencarian menu. Tandai `mobile => true` kalau layak masuk bottom nav.
-4. **Pencarian global**: tambah satu bagian di `$sections` pada `global-search.blade.php`.
-5. **Audit trail**: pakai trait `Auditable` di model dan tambah label di `AuditTrail::SUBJECT_LABELS`.
-6. **Dokumentasi API** terbentuk otomatis dari FormRequest, Resource, dan atribut `#[ApiTag]`. Cek hasilnya di `/docs/api`.
-7. Jalankan `php artisan test --compact`. `FeatureTogglesTest` gagal kalau ada route yang belum terdaftar di `Features::MODULES`, dan `ApiDocumentationTest` gagal kalau ada endpoint API tanpa sakelar fitur atau belum terdokumentasi.
+1. **Tenant**: model memakai trait `BelongsToTenant`, migrasi menambah `foreignId('tenant_id')->constrained()`, kolom yang harus unik dibuat unik bersama `tenant_id`, dan validasi memakai `TenantRule::unique()`/`TenantRule::exists()`. Tambahkan datanya ke `TenantDataExporter::datasets()` supaya ikut terekspor, dan tes isolasinya di `tests/Feature/Tenancy/`.
+2. **Izin**: tambah grup di `PermissionSeeder::PERMISSION_GROUPS` dan isi `DEFAULT_ROLE_PERMISSIONS`. Halaman Peran & Perizinan membacanya otomatis.
+3. **Sakelar fitur**: tambah modul/fitur di `Features::MODULES` beserta pola nama route-nya. Route web yang tidak terdaftar selalu terbuka. Route API memakai middleware `feature:modul.fitur`.
+4. **Menu**: tambah entri di `Navigation::items()` dengan `route`, `icon`, `feature`, `can`, dan `keywords` untuk pencarian menu. Tandai `mobile => true` kalau layak masuk bottom nav.
+5. **Pencarian global**: tambah satu bagian di `$sections` pada `global-search.blade.php`.
+6. **Audit trail**: pakai trait `Auditable` di model dan tambah label di `AuditTrail::SUBJECT_LABELS`.
+7. **Dokumentasi API** terbentuk otomatis dari FormRequest, Resource, dan atribut `#[ApiTag]`. Cek hasilnya di `/docs/api`.
+8. Jalankan `php artisan test --compact`. `FeatureTogglesTest` gagal kalau ada route yang belum terdaftar di `Features::MODULES`, dan `ApiDocumentationTest` gagal kalau ada endpoint API tanpa sakelar fitur atau belum terdokumentasi.
 
 Untuk tautan ke halaman modul lain, pakai `<x-feature-link :href="...">` supaya tautannya otomatis jadi teks biasa saat fiturnya dimatikan.
 
 ## REST API (Aplikasi Mobile)
 
-Semua endpoint ada di `/api/v1`, autentikasi Sanctum Bearer token, dan hak aksesnya sama dengan web (peran, izin, dan sakelar fitur). Dokumentasi interaktif: `/docs/api` (Scalar), spesifikasi mentah: `/api/openapi.json`; keduanya hanya bisa dibuka superadmin yang sedang login. Untuk developer mobile, ekspor ke file dengan `php artisan api:docs --output=storage/app/openapi.json`.
+Semua endpoint ada di `/api/v1`, autentikasi Sanctum Bearer token, dan hak aksesnya sama dengan web (toko, peran, izin, dan sakelar fitur). Dokumentasi interaktif: `/docs/api` (Scalar), spesifikasi mentah: `/api/openapi.json`; keduanya hanya bisa dibuka superadmin yang sedang login. Untuk developer mobile, ekspor ke file dengan `php artisan api:docs --output=storage/app/openapi.json`.
 
-Tidak ada pendaftaran mandiri. Akun pegawai dibuat di **Pengaturan > Peran & Perizinan > Penugasan Pengguna** (izin `users.manage`); dari sana juga admin bisa mengeluarkan akun dari semua perangkat mobile. Ganti/reset password di web otomatis mencabut sesi mobile.
+Toko baru mendaftar lewat `auth/register` (atau `/daftar` di web) dan langsung mendapat token pemiliknya. Akun pegawai dibuat di **Pengaturan > Peran & Perizinan > Penugasan Pengguna** (izin `users.manage`); dari sana juga admin bisa mengeluarkan akun dari semua perangkat mobile. Ganti/reset password di web otomatis mencabut sesi mobile.
+
+`auth/me` dan respons login menyertakan `tenant` (nama, paket, `access_ends_at`, `blocked_reason`). Saat toko diblokir, endpoint lain menjawab `402` dengan `reason`; lihat [Alur toko](#alur-toko).
 
 | Grup | Endpoint |
 | --- | --- |
-| Akun | `auth/*` (login password/OTP WhatsApp, profil, logout), `dashboard`, `meta`, `search`, `notifications` |
+| Akun | `auth/*` (daftar toko, login password/OTP WhatsApp, profil, logout), `dashboard`, `meta`, `search`, `notifications` |
 | Master Data | `master-data/customers`, `master-data/categories`, `master-data/products` (+ `products/{id}/image`) |
 | Stok | `inventory/stock`, `inventory/stock/summary`, `inventory/movements`, `inventory/adjustments` |
 | Kasir | `pos/config`, `pos/categories`, `pos/products`, `pos/products/lookup`, `pos/customers`, `pos/qris`, `pos/checkout`, `pos/shift`, `pos/held-orders` |
 | Penjualan | `sales` (+ `void`, `receipt`), `shifts` (+ `sales`, `close`, `cash-movements`), `receivables` (+ `payments`), `print/receipt/{sale}`, `print/shift/{shift}` |
 | Laporan | `reports/sales/summary`, `reports/sales/daily`, `reports/sales/products`, `reports/activity-log` |
 
-Penolakan dari layar kasir (stok kurang, harga berubah, shift belum dibuka) dikembalikan `422` dengan `reason` dan `context` supaya aplikasi bisa menanganinya tanpa membaca teks pesan. Pengaturan (profil perusahaan, kasir, peran, fitur, backup) sengaja hanya tersedia di web.
+Penolakan dari layar kasir (stok kurang, harga berubah, shift belum dibuka) dikembalikan `422` dengan `reason` dan `context` supaya aplikasi bisa menanganinya tanpa membaca teks pesan. Pengaturan (profil perusahaan, kasir, peran, fitur, ekspor data) sengaja hanya tersedia di web; backup hanya untuk admin platform.
 
-### TODO Aplikasi Mobile
+### Aplikasi mobile
 
-Sisi aplikasi (semua endpoint sudah tersedia):
-
-- [ ] Login password & OTP WhatsApp, simpan token di secure storage, tangani `401` dengan kembali ke layar login
-- [ ] Dashboard, notifikasi (badge dari `notifications/unread-count`), dan pencarian global
-- [ ] Layar kasir: katalog + filter kategori, scan barcode kamera via `pos/products/lookup`, keranjang dengan jumlah desimal, diskon sesuai izin
-- [ ] Checkout semua metode bayar (tunai, QRIS bernominal, transfer, kartu, split, kasbon) dengan `client_uuid` per keranjang supaya retry tidak dobel
-- [ ] Tangani penolakan `422` berdasarkan `reason` (harga berubah, stok kurang, shift belum dibuka) tanpa membaca teks pesan
-- [ ] Simpan keranjang aktif di perangkat dan pulihkan saat aplikasi dibuka ulang
-- [ ] Transaksi tertunda: simpan, lanjutkan, hapus
-- [ ] Shift: buka, kas masuk/keluar, tutup dengan selisih, cetak rekap
-- [ ] Riwayat penjualan, detail, void dengan alasan, kirim struk lewat WhatsApp
-- [ ] Piutang: daftar & pelunasan bertahap
-- [ ] Master data produk/kategori/pelanggan termasuk unggah foto produk
-- [ ] Stok: daftar, ringkasan, kartu stok, stok masuk/keluar/opname
-- [ ] Laporan penjualan (ringkasan, harian, produk) dan log aktivitas
-- [ ] Cetak struk ke printer thermal Bluetooth dari teks `sales/{id}/receipt` (sudah menyertakan `paper_width`)
-- [ ] Cetak rekap shift / simpan PDF: render HTML dari `print/*` di WebView
-- [ ] Sembunyikan menu sesuai izin & sakelar fitur dari `auth/me`
+Client Flutter-nya ada di repository terpisah [web-pos-mobile](../web-pos-mobile) (kasir, shift, riwayat, master data, stok, laporan, printer Bluetooth, mode offline, pendaftaran toko).
 
 Belum ada di API (perlu dikerjakan di backend kalau dibutuhkan):
 
 - [ ] Push notification (FCM): endpoint registrasi device token dan pengiriman notifikasi ke perangkat
 - [ ] Layar pelanggan dari aplikasi: endpoint setara `pos.display.push` untuk mengirim isi keranjang ke layar yang dipasangkan
-- [ ] Ekspor riwayat transaksi/laporan ke file
-- [ ] Mode offline: antrean checkout saat koneksi putus lalu sinkron otomatis
+- [ ] Ekspor riwayat transaksi/laporan ke file (ekspor seluruh data toko sudah ada di web)
+- [ ] Pembayaran langganan otomatis (payment gateway); sekarang masa aktif diperpanjang manual dari panel Platform
 
 ## Menjalankan Test & Pemeriksaan Kode
 
@@ -209,5 +262,6 @@ Workflow `.github/workflows/tests.yml` menjalankan ketiganya di setiap push ke `
 
 - Zona waktu default WIB (`APP_TIMEZONE=Asia/Jakarta`) dan bahasa Indonesia (`APP_LOCALE=id`).
 - Broadcasting memakai Reverb (`BROADCAST_CONNECTION=reverb`). Kalau Reverb mati, penyimpanan data tetap berhasil: event memakai `ShouldRescue` dan notifikasi di-queue.
-- Notifikasi dan backup berjalan lewat queue (`QUEUE_CONNECTION=database`), jadi di production perlu worker (`php artisan queue:work`) dan scheduler (`php artisan schedule:run` tiap menit) untuk backup terjadwal.
+- Notifikasi dan backup berjalan lewat queue (`QUEUE_CONNECTION=database`), jadi di production perlu worker (`php artisan queue:work`) dan scheduler (`php artisan schedule:run` tiap menit) untuk backup terjadwal. Backup mencakup database semua toko dan hanya bisa diatur admin platform.
+- Masa uji coba toko baru: `SAAS_TRIAL_DAYS` (default 14). Nama, batas pengguna, dan batas produk tiap paket ada di `config/saas.php`.
 - Export dokumentasi API ke file: `php artisan api:docs --output=storage/app/openapi.json`.
