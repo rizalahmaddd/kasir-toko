@@ -12,6 +12,7 @@ Route::prefix('v1')->name('api.v1.')->middleware('throttle:api')->group(function
 
     Route::middleware('auth:sanctum')->group(function () {
         require __DIR__.'/api/v1/account.php';
+        require __DIR__.'/api/v1/onboarding.php';
         require __DIR__.'/api/v1/general.php';
         require __DIR__.'/api/v1/master-data.php';
         require __DIR__.'/api/v1/pos.php';

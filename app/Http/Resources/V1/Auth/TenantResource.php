@@ -8,14 +8,15 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * Toko tempat akun terdaftar beserta status langganannya. `blocked_reason` terisi
- * (tenant_suspended, trial_expired, subscription_expired) saat toko tidak bisa dipakai.
+ * (tenant_suspended, trial_expired, subscription_expired) saat toko tidak bisa dipakai. Selama
+ * `onboarded` false, pemilik toko belum memilih preset jenis toko (`store_type`) atau melewatinya.
  *
  * @mixin Tenant
  */
 class TenantResource extends JsonResource
 {
     /**
-     * @return array{id: int, name: string, slug: string, plan: string, plan_label: string, status: string, access_ends_at: string|null, blocked_reason: string|null}
+     * @return array{id: int, name: string, slug: string, plan: string, plan_label: string, status: string, access_ends_at: string|null, blocked_reason: string|null, onboarded: bool, store_type: string|null}
      */
     public function toArray(Request $request): array
     {
@@ -28,6 +29,8 @@ class TenantResource extends JsonResource
             'status' => $this->status,
             'access_ends_at' => $this->accessEndsAt()?->toIso8601String(),
             'blocked_reason' => $this->blockedReason(),
+            'onboarded' => $this->isOnboarded(),
+            'store_type' => $this->store_type?->value,
         ];
     }
 }

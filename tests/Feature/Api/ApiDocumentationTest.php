@@ -11,7 +11,7 @@ it('guards every business endpoint with a known feature toggle', function () {
     foreach (Route::getRoutes() as $route) {
         $name = (string) $route->getName();
 
-        if (! Str::startsWith($name, 'api.v1.') || Str::is(['api.v1.auth.*', 'api.v1.lookups.*', 'api.v1.dashboard*', 'api.v1.notifications.*'], $name)) {
+        if (! Str::startsWith($name, 'api.v1.') || Str::is(['api.v1.auth.*', 'api.v1.lookups.*', 'api.v1.dashboard*', 'api.v1.notifications.*', 'api.v1.onboarding.*'], $name)) {
             continue;
         }
 
