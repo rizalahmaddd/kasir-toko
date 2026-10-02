@@ -52,13 +52,29 @@ Username, email, dan nomor HP unik di seluruh layanan, jadi login tidak perlu ko
 
 ### Alur toko
 
-1. **Daftar** di `/daftar` (web) atau `POST /api/v1/auth/register` (aplikasi mobile). Toko dibuat beserta peran bawaan (superadmin, admin, kasir, staff) dan akun pemiliknya, lalu langsung masuk. Masa uji coba diatur dengan `SAAS_TRIAL_DAYS` (default 14 hari).
+1. **Daftar** di `/daftar` (web) atau `POST /api/v1/auth/register` (aplikasi mobile). Toko dibuat beserta peran bawaan (superadmin, admin, kasir, staff) dan akun pemiliknya, lalu langsung masuk ke [persiapan toko](#persiapan-toko-preset-jenis-toko). Masa uji coba diatur dengan `SAAS_TRIAL_DAYS` (default 14 hari).
 2. **Masa aktif** dihitung dari `trial_ends_at` untuk paket `trial` dan `subscription_ends_at` untuk paket berbayar; kosong berarti tanpa batas.
 3. **Toko diblokir** kalau dinonaktifkan admin platform atau masa aktifnya habis:
    - web: semua halaman dialihkan ke `/langganan`, aksi Livewire di halaman yang masih terbuka ditolak `402`;
    - API: `402` dengan `reason` (`tenant_suspended`, `trial_expired`, `subscription_expired`); `auth/me` dan logout tetap bisa dipakai supaya aplikasi bisa menampilkan statusnya.
    Data toko tidak dihapus; begitu diaktifkan atau diperpanjang, toko langsung bisa dipakai lagi.
 4. **Batas paket** dicek saat menambah produk dan pengguna baru; data yang sudah ada tidak disentuh saat toko turun paket.
+
+### Persiapan toko (preset jenis toko)
+
+Setelah mendaftar, pemilik toko (superadmin) dialihkan ke `/persiapan-toko` sampai memilih jenis toko atau menekan **Lewati, mulai dari kosong**. Kasir, peran lain, dan admin platform tidak pernah dialihkan; toko yang sudah ada sebelum fitur ini dianggap selesai (`tenants.onboarded_at` diisi saat migrasi).
+
+Ada 10 jenis toko: Warung/Kelontong, Minimarket, Kafe, Restoran, Fashion, Toko Bangunan, Konter HP & Pulsa, Apotek, Bakery, dan Lainnya. Tiap preset membuat kategori, produk contoh opsional (stok 0, SKU dari penomoran `PRD`, menu racikan kafe/restoran tanpa lacak stok), pengaturan kasir (pajak PB1 10% untuk kafe/restoran, kasbon, nominal cepat, catatan kaki struk), dan menyalakan/mematikan fitur Piutang serta Layar Pelanggan. Produk contoh dibatasi sisa kuota paket.
+
+| Bagian | Lokasi |
+|---|---|
+| Daftar jenis toko | `app/Enums/StoreType.php` |
+| Isi preset | `app/Support/StorePresets.php` |
+| Penerapan (transaksi, aman diulang) | `app/Services/StorePresetApplier.php` |
+| Pengalihan pemilik toko | `app/Http/Middleware/EnsureStoreOnboarded.php` |
+| Halaman wizard | `resources/views/livewire/pages/onboarding.blade.php` |
+
+Preset bisa diterapkan lagi dari **Pengaturan → Perusahaan → Jenis Toko** selama toko belum punya transaksi penjualan. Kategori dan produk yang namanya sudah ada dilewati, pengaturan kasir ditimpa.
 
 Pembayaran langganan belum otomatis: admin platform mengubah paket dan masa aktif dari panel **Platform → Toko Pelanggan** (`/platform/toko`), termasuk tombol perpanjang 30 hari dan menonaktifkan toko.
 
@@ -224,11 +240,11 @@ Semua endpoint ada di `/api/v1`, autentikasi Sanctum Bearer token, dan hak akses
 
 Toko baru mendaftar lewat `auth/register` (atau `/daftar` di web) dan langsung mendapat token pemiliknya. Akun pegawai dibuat di **Pengaturan > Peran & Perizinan > Penugasan Pengguna** (izin `users.manage`); dari sana juga admin bisa mengeluarkan akun dari semua perangkat mobile. Ganti/reset password di web otomatis mencabut sesi mobile.
 
-`auth/me` dan respons login menyertakan `tenant` (nama, paket, `access_ends_at`, `blocked_reason`). Saat toko diblokir, endpoint lain menjawab `402` dengan `reason`; lihat [Alur toko](#alur-toko).
+`auth/me` dan respons login menyertakan `tenant` (nama, paket, `access_ends_at`, `blocked_reason`, `onboarded`, `store_type`). Saat toko diblokir, endpoint lain menjawab `402` dengan `reason`; lihat [Alur toko](#alur-toko).
 
 | Grup | Endpoint |
 | --- | --- |
-| Akun | `auth/*` (daftar toko, login password/OTP WhatsApp, profil, logout), `dashboard`, `meta`, `search`, `notifications` |
+| Akun | `auth/*` (daftar toko, login password/OTP WhatsApp, profil, logout), `onboarding/presets`, `onboarding/apply`, `onboarding/skip`, `dashboard`, `meta`, `search`, `notifications` |
 | Master Data | `master-data/customers`, `master-data/categories`, `master-data/products` (+ `products/{id}/image`) |
 | Stok | `inventory/stock`, `inventory/stock/summary`, `inventory/movements`, `inventory/adjustments` |
 | Kasir | `pos/config`, `pos/categories`, `pos/products`, `pos/products/lookup`, `pos/customers`, `pos/qris`, `pos/checkout`, `pos/shift`, `pos/held-orders` |
