@@ -23,12 +23,18 @@ class TenantFactory extends Factory
             'slug' => Str::slug($name).'-'.Str::lower(Str::random(4)),
             'status' => Tenant::STATUS_ACTIVE,
             'plan' => 'pro',
+            'onboarded_at' => now(),
         ];
     }
 
     public function trial(?int $daysLeft = 14): static
     {
         return $this->state(fn () => ['plan' => Tenant::PLAN_TRIAL, 'trial_ends_at' => now()->addDays($daysLeft)]);
+    }
+
+    public function pendingOnboarding(): static
+    {
+        return $this->state(fn () => ['onboarded_at' => null, 'store_type' => null]);
     }
 
     public function suspended(): static

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\StoreType;
 use Database\Factories\TenantFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -24,7 +25,7 @@ class Tenant extends Model
 
     public const PLAN_TRIAL = 'trial';
 
-    protected $fillable = ['name', 'slug', 'status', 'plan', 'trial_ends_at', 'subscription_ends_at'];
+    protected $fillable = ['name', 'slug', 'status', 'plan', 'trial_ends_at', 'subscription_ends_at', 'store_type', 'onboarded_at'];
 
     /**
      * @return HasMany<User, $this>
@@ -83,6 +84,14 @@ class Tenant extends Model
         };
     }
 
+    /**
+     * Onboarding selesai saat pemilik menerapkan preset jenis toko atau melewatinya.
+     */
+    public function isOnboarded(): bool
+    {
+        return $this->onboarded_at !== null;
+    }
+
     public function planLabel(): string
     {
         return config("saas.plans.{$this->plan}.label", Str::title($this->plan));
@@ -101,6 +110,8 @@ class Tenant extends Model
         return [
             'trial_ends_at' => 'datetime',
             'subscription_ends_at' => 'datetime',
+            'onboarded_at' => 'datetime',
+            'store_type' => StoreType::class,
         ];
     }
 }

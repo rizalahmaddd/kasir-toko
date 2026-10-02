@@ -16,7 +16,7 @@ class DatabaseSeeder extends Seeder
 
     public function run(): void
     {
-        $tenant = Tenant::query()->firstOrCreate(['slug' => 'toko-demo'], ['name' => 'Toko Demo', 'plan' => 'pro']);
+        $tenant = Tenant::query()->firstOrCreate(['slug' => 'toko-demo'], ['name' => 'Toko Demo', 'plan' => 'pro', 'onboarded_at' => now()]);
 
         app(CurrentTenant::class)->run($tenant, function () {
             $this->call(RoleSeeder::class);

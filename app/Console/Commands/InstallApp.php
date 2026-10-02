@@ -52,13 +52,14 @@ class InstallApp extends Command
         $this->components->task("Toko {$tenant->name} beserta peran & izin bawaan");
         $this->components->task("Akun superadmin {$user->email}");
 
-        app(CurrentTenant::class)->run($tenant, function () use ($appName) {
+        app(CurrentTenant::class)->run($tenant, function () use ($appName, $tenant) {
             Setting::put(Branding::APP_NAME_KEY, $appName);
             $this->components->task('Branding aplikasi');
 
             if ($this->option('demo') || ($this->input->isInteractive() && confirm('Isi data demo (pelanggan & produk contoh)?', default: false))) {
                 $this->callSilently('db:seed', ['--class' => MasterDataSeeder::class, '--force' => true]);
                 $this->callSilently('db:seed', ['--class' => PosDemoSeeder::class, '--force' => true]);
+                $tenant->forceFill(['onboarded_at' => now()])->save();
                 $this->components->task('Data demo');
             }
         });
