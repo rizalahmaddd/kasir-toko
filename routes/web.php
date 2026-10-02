@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\OpenApiDocumentController;
 use App\Http\Controllers\BrandingLogoController;
 use App\Livewire\Dashboard;
 use Illuminate\Support\Facades\Route;
+use Livewire\Volt\Volt;
 
 // Aplikasi internal: tidak ada landing page, "/" langsung ke dashboard atau ke login.
 Route::redirect('/', '/dashboard');
@@ -14,6 +15,11 @@ Route::get('branding/logo', BrandingLogoController::class)->name('branding.logo'
 Route::get('dashboard', Dashboard::class)
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
+
+// Pemilik toko baru diarahkan ke sini oleh EnsureStoreOnboarded; dibuka lagi dari Pengaturan Perusahaan.
+Volt::route('persiapan-toko', 'pages.onboarding')
+    ->middleware(['auth', 'verified'])
+    ->name('onboarding');
 
 // Rendered by Scalar at /docs/api. Lives on the web stack because the docs page fetches it with the
 // superadmin's session cookie; mobile developers can also export it with `php artisan api:docs`.

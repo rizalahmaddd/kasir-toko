@@ -2,6 +2,7 @@
     $tabs = [
         'branding' => ['label' => 'Branding', 'icon' => 'palette', 'hint' => 'Nama & logo aplikasi'],
         'kop-surat' => ['label' => 'Kop Surat', 'icon' => 'building-2', 'hint' => 'Identitas di dokumen cetak'],
+        'jenis-toko' => ['label' => 'Jenis Toko', 'icon' => 'store', 'hint' => 'Preset kategori & kasir'],
     ];
     $previewLogoUrl = $logo && ! $errors->has('logo') ? $logo->temporaryUrl() : null;
 @endphp
@@ -226,5 +227,39 @@
                 </div>
             </aside>
         </div>
+    @elseif ($tab === 'jenis-toko')
+        <section class="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-6 space-y-4 max-w-3xl" wire:key="tab-jenis-toko">
+            <div>
+                <h2 class="font-bold text-sm text-slate-100">Jenis Toko</h2>
+                <p class="text-xs text-slate-400 mt-0.5">Preset menyiapkan kategori, produk contoh, pajak, kasbon, dan catatan kaki struk sesuai jenis toko.</p>
+            </div>
+
+            <div class="flex items-center gap-3 p-3 rounded-lg border border-slate-800 bg-slate-950">
+                <span class="inline-flex items-center justify-center w-10 h-10 shrink-0 rounded-lg bg-slate-800 text-emerald-400">
+                    <i data-lucide="{{ $storeType?->icon() ?? 'store' }}" class="w-5 h-5"></i>
+                </span>
+                <div class="min-w-0">
+                    <div class="text-sm font-semibold text-slate-100">{{ $storeType?->label() ?? 'Belum dipilih' }}</div>
+                    <div class="text-[11px] text-slate-400">{{ $storeType ? $storeType->description() : 'Toko ini dimulai dari kosong tanpa preset.' }}</div>
+                </div>
+            </div>
+
+            @if (! $canApplyPreset)
+                <p class="text-xs text-slate-400">Hanya pemilik toko (Superadmin) yang bisa menerapkan preset.</p>
+            @elseif ($presetBlockedReason)
+                <div class="space-y-2">
+                    <x-secondary-button disabled>Terapkan Preset Lagi</x-secondary-button>
+                    <p class="text-xs text-amber-300">{{ $presetBlockedReason }}</p>
+                </div>
+            @else
+                <div class="space-y-2">
+                    <a href="{{ route('onboarding') }}" wire:navigate
+                        class="inline-flex items-center justify-center gap-2 min-h-[44px] px-4 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900">
+                        {{ $storeType ? 'Terapkan Preset Lagi' : 'Pilih Preset Jenis Toko' }}
+                    </a>
+                    <p class="text-[11px] text-slate-400">Hanya bisa selama toko belum punya transaksi penjualan. Kategori dan produk yang sudah ada tidak dihapus.</p>
+                </div>
+            @endif
+        </section>
     @endif
 </div>

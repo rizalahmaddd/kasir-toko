@@ -27,7 +27,7 @@ new #[Layout('layouts.guest')] class extends Component
     public string $password_confirmation = '';
 
     /**
-     * Daftar toko baru beserta akun pemiliknya, lalu langsung masuk.
+     * Daftar toko baru beserta akun pemiliknya, lalu langsung masuk ke persiapan toko.
      */
     public function register(TenantProvisioner $provisioner): void
     {
@@ -55,7 +55,7 @@ new #[Layout('layouts.guest')] class extends Component
         Auth::login($owner);
         Session::regenerate();
 
-        $this->redirect(route('dashboard', absolute: false), navigate: true);
+        $this->redirect(route('onboarding', absolute: false), navigate: true);
     }
 }; ?>
 

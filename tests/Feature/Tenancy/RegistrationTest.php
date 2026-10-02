@@ -27,7 +27,8 @@ it('registers a new shop on a trial and returns a token for its owner', function
         ->assertJsonPath('data.user.is_superadmin', true)
         ->assertJsonPath('data.user.tenant.name', 'Toko Baru Jaya')
         ->assertJsonPath('data.user.tenant.plan', 'trial')
-        ->assertJsonPath('data.user.tenant.blocked_reason', null);
+        ->assertJsonPath('data.user.tenant.blocked_reason', null)
+        ->assertJsonPath('data.user.tenant.onboarded', false);
 
     $tenant = Tenant::query()->where('name', 'Toko Baru Jaya')->sole();
 
@@ -47,19 +48,20 @@ it('rejects a registration that reuses another account\'s email', function () {
     expect(Tenant::query()->where('name', 'Toko Baru Jaya')->exists())->toBeFalse();
 });
 
-it('registers from the web page and signs the owner in', function () {
+it('registers from the web page and signs the owner in to onboarding', function () {
     app(CurrentTenant::class)->set(null);
 
     Volt::test('pages.auth.register')
         ->set(registrationPayload())
         ->call('register')
         ->assertHasNoErrors()
-        ->assertRedirect(route('dashboard', absolute: false));
+        ->assertRedirect(route('onboarding', absolute: false));
 
     $owner = User::withoutGlobalScopes()->where('email', 'pemilik@baru.test')->sole();
 
     expect(auth()->id())->toBe($owner->id)
-        ->and($owner->tenant->name)->toBe('Toko Baru Jaya');
+        ->and($owner->tenant->name)->toBe('Toko Baru Jaya')
+        ->and($owner->tenant->isOnboarded())->toBeFalse();
 });
 
 it('links to the registration page from the login page', function () {

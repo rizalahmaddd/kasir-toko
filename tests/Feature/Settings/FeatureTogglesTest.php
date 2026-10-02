@@ -276,7 +276,7 @@ test('feature toggles bulk actions and reset changes operate properly', function
 
 test('every app route belongs to a feature unless it is deliberately always open', function () {
     $alwaysOpen = [
-        'dashboard', 'profile', 'settings.features', 'platform.*', 'subscription.inactive', 'branding.logo',
+        'dashboard', 'profile', 'settings.features', 'platform.*', 'subscription.inactive', 'onboarding', 'branding.logo',
         'login', 'register', 'password.*', 'verification.*',
         '*livewire.*', 'boost.*', 'storage.*',
         // API routes name their feature through the `feature:` middleware instead (tests/Feature/Api/ApiDocumentationTest.php).

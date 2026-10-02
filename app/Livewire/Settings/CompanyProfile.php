@@ -3,6 +3,7 @@
 namespace App\Livewire\Settings;
 
 use App\Models\Setting;
+use App\Services\StorePresetApplier;
 use App\Support\Branding;
 use App\Support\CurrentTenant;
 use Illuminate\Support\Facades\Auth;
@@ -26,7 +27,7 @@ class CompanyProfile extends Component
 {
     use WithFileUploads;
 
-    public const TABS = ['branding', 'kop-surat'];
+    public const TABS = ['branding', 'kop-surat', 'jenis-toko'];
 
     #[Url(as: 'tab', except: 'branding')]
     public string $tab = 'branding';
@@ -128,6 +129,13 @@ class CompanyProfile extends Component
 
     public function render()
     {
-        return view('livewire.settings.company-profile');
+        $tenant = app(CurrentTenant::class)->get();
+        $applier = app(StorePresetApplier::class);
+
+        return view('livewire.settings.company-profile', [
+            'storeType' => $tenant?->store_type,
+            'canApplyPreset' => Auth::user()->isSuperAdmin(),
+            'presetBlockedReason' => $tenant ? $applier->reapplyBlockedReason($tenant) : null,
+        ]);
     }
 }

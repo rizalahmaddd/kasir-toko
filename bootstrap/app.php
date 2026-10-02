@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureApiFeatureEnabled;
 use App\Http\Middleware\EnsureFeatureEnabled;
+use App\Http\Middleware\EnsureStoreOnboarded;
 use App\Http\Middleware\EnsureTenantAccess;
 use App\Http\Middleware\IdentifyTenant;
 use App\Services\Pos\PosException;
@@ -36,6 +37,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             IdentifyTenant::class,
             EnsureTenantAccess::class,
+            EnsureStoreOnboarded::class,
             EnsureFeatureEnabled::class,
         ]);
         $middleware->api(append: [
