@@ -147,7 +147,10 @@ class Navigation
             [
                 'label' => 'Platform',
                 'items' => [
-                    ['label' => 'Toko Pelanggan', 'icon' => 'store', 'route' => 'platform.tenants', 'mobile' => true, 'keywords' => 'tenant toko pelanggan langganan paket suspend'],
+                    ['label' => 'Dashboard', 'icon' => 'layout-dashboard', 'route' => 'platform.dashboard', 'mobile' => true, 'keywords' => 'ringkasan statistik pendapatan langganan'],
+                    ['label' => 'Toko Pelanggan', 'icon' => 'store', 'route' => 'platform.tenants', 'active' => 'platform.tenants*', 'mobile' => true, 'keywords' => 'tenant toko pelanggan langganan paket suspend perpanjang'],
+                    ['label' => 'Admin Platform', 'icon' => 'shield-user', 'route' => 'platform.admins', 'keywords' => 'admin pengelola akun platform'],
+                    ['label' => 'Pengaturan Layanan', 'icon' => 'sliders-horizontal', 'route' => 'platform.settings', 'keywords' => 'pendaftaran uji coba trial paket'],
                     ['label' => 'Backup & Restore', 'icon' => 'database-backup', 'route' => 'platform.backups', 'active' => 'platform.backups*', 'mobile' => true, 'keywords' => 'backup cadangan restore pulihkan database'],
                 ],
             ],

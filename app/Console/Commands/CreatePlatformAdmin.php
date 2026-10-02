@@ -51,7 +51,7 @@ class CreatePlatformAdmin extends Command
             return $user;
         });
 
-        $this->components->info("Admin platform {$user->email} dibuat. Panel: ".route('platform.tenants'));
+        $this->components->info("Admin platform {$user->email} dibuat. Panel: ".route('platform.dashboard'));
 
         return self::SUCCESS;
     }

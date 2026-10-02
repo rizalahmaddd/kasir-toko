@@ -47,7 +47,7 @@ class EnsureTenantAccess
 
             abort_if($isApi || ! $user->is_platform_admin || $this->isLivewire($request), 403, __('Akun ini tidak terhubung ke toko mana pun.'));
 
-            return redirect()->route('platform.tenants');
+            return redirect()->route('platform.dashboard');
         }
 
         $reason = app(CurrentTenant::class)->get()?->blockedReason();

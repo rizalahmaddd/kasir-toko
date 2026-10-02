@@ -9,8 +9,8 @@ use Livewire\Livewire;
 it('keeps platform admins inside the platform panel', function () {
     actingAsPlatformAdmin();
 
-    $this->get(route('dashboard'))->assertRedirect(route('platform.tenants'));
-    $this->get(route('master-data.products'))->assertRedirect(route('platform.tenants'));
+    $this->get(route('dashboard'))->assertRedirect(route('platform.dashboard'));
+    $this->get(route('master-data.products'))->assertRedirect(route('platform.dashboard'));
     $this->get(route('platform.tenants'))->assertOk()->assertSee($this->tenant->name);
 });
 

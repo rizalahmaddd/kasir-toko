@@ -9,6 +9,8 @@ use Illuminate\Validation\Rules\Password;
 
 class RegisterRequest extends FormRequest
 {
+    public const CLOSED_MESSAGE = 'Pendaftaran toko baru sedang ditutup. Hubungi admin layanan.';
+
     protected function prepareForValidation(): void
     {
         $this->merge([

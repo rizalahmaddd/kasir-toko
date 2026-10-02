@@ -530,7 +530,7 @@ new #[Layout('layouts.guest')] class extends Component
         @endif
     @endif
 
-    @if (Route::has('register'))
+    @if (Route::has('register') && \App\Support\SaasSettings::registrationOpen())
         <p class="mt-6 text-center text-xs text-slate-500 dark:text-slate-400">
             Belum punya toko?
             <a href="{{ route('register') }}" wire:navigate class="font-semibold text-emerald-600 dark:text-emerald-400 hover:underline">Daftar gratis</a>

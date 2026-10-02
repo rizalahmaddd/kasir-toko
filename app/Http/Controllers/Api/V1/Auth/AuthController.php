@@ -16,6 +16,7 @@ use App\Services\WhatsAppOtpService;
 use App\Support\CurrentTenant;
 use App\Support\OpenApi\Attributes\ApiResponse;
 use App\Support\OpenApi\Attributes\ApiTag;
+use App\Support\SaasSettings;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Auth\Events\Login;
@@ -112,6 +113,8 @@ class AuthController extends Controller
     #[ApiResponse(TokenResource::class, status: 201)]
     public function register(RegisterRequest $request, TenantProvisioner $provisioner): JsonResponse
     {
+        abort_unless(SaasSettings::registrationOpen(), 403, RegisterRequest::CLOSED_MESSAGE);
+
         ['owner' => $owner] = $provisioner->provision(
             $request->string('shop_name')->trim()->value(),
             $request->safe()->only(['name', 'username', 'email', 'phone', 'password']),

@@ -6,6 +6,7 @@ use App\Models\Setting;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Support\CurrentTenant;
+use App\Support\SaasSettings;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\DB;
@@ -33,7 +34,7 @@ class TenantProvisioner
                 'name' => $shopName,
                 'slug' => Tenant::uniqueSlug($shopName),
                 'plan' => $plan ?? Tenant::PLAN_TRIAL,
-                'trial_ends_at' => now()->addDays(config('saas.trial_days')),
+                'trial_ends_at' => now()->addDays(SaasSettings::trialDays()),
             ]);
 
             $user = $this->currentTenant->run($tenant, function () use ($shopName, $owner) {
