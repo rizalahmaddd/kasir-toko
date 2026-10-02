@@ -10,10 +10,12 @@ use App\Http\Resources\V1\MetaResource;
 use App\Http\Resources\V1\NotificationResource;
 use App\Http\Resources\V1\SearchResultResource;
 use App\Livewire\MasterData\Products;
+use App\Models\Setting;
 use App\Support\Branding;
 use App\Support\OpenApi\Attributes\ApiQuery;
 use App\Support\OpenApi\Attributes\ApiResponse;
 use App\Support\OpenApi\Attributes\ApiTag;
+use App\Support\PosSettings;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
@@ -23,8 +25,9 @@ class MetaController extends Controller
     /**
      * Konfigurasi & enum.
      *
-     * Nama/logo aplikasi dan label semua pilihan tetap untuk mengisi form. Cukup diambil sekali
-     * saat aplikasi dibuka.
+     * Nama/logo aplikasi, identitas toko untuk struk, dan label semua pilihan tetap untuk mengisi
+     * form. Cukup diambil sekali saat aplikasi dibuka. `receipt` berisi semua yang dicetak di kepala
+     * dan kaki struk thermal, supaya aplikasi bisa mencetak sendiri lewat Bluetooth.
      */
     public function meta(): MetaResource
     {
@@ -34,6 +37,16 @@ class MetaController extends Controller
                 'company_name' => Branding::companyName(),
                 'tagline' => Branding::tagline(),
                 'logo_url' => Branding::logoUrl(),
+            ],
+            'receipt' => [
+                'store_name' => Branding::companyName(),
+                'address' => (string) Setting::get('company_address', ''),
+                'phone' => (string) Setting::get('company_phone', ''),
+                'header' => PosSettings::get('pos.receipt_header'),
+                'footer' => PosSettings::get('pos.receipt_footer'),
+                'tax_label' => PosSettings::taxLabel(),
+                'paper_width' => PosSettings::receiptWidth(),
+                'auto_print' => PosSettings::autoPrint(),
             ],
             'enums' => [
                 'customer_payment_terms' => ['0' => 'Tunai', '14' => '14 hari', '30' => '30 hari', '45' => '45 hari'],

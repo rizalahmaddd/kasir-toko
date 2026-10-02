@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Customer;
+use App\Models\Setting;
 use App\Support\Features;
 use Laravel\Sanctum\Sanctum;
 
@@ -56,5 +57,23 @@ it('returns app configuration in meta', function () {
 
     $this->getJson('/api/v1/meta')
         ->assertOk()
-        ->assertJsonStructure(['data' => ['app' => ['name', 'company_name', 'tagline', 'logo_url'], 'enums']]);
+        ->assertJsonStructure(['data' => ['app' => ['name', 'company_name', 'tagline', 'logo_url'], 'receipt', 'enums']]);
+});
+
+it('returns the receipt profile so the app can print on its own', function () {
+    apiActingAs('staff');
+    Setting::put('company_address', 'Jl. Merdeka 10, Malang');
+    Setting::put('company_phone', '0341-123456');
+    Setting::put('pos.receipt_header', 'Buka 07.00 - 21.00');
+    Setting::put('pos.receipt_width', '80');
+
+    $this->getJson('/api/v1/meta')
+        ->assertOk()
+        ->assertJsonPath('data.receipt.address', 'Jl. Merdeka 10, Malang')
+        ->assertJsonPath('data.receipt.phone', '0341-123456')
+        ->assertJsonPath('data.receipt.header', 'Buka 07.00 - 21.00')
+        ->assertJsonPath('data.receipt.footer', 'Terima kasih atas kunjungan Anda')
+        ->assertJsonPath('data.receipt.tax_label', 'PPN')
+        ->assertJsonPath('data.receipt.paper_width', '80')
+        ->assertJsonPath('data.receipt.auto_print', false);
 });
