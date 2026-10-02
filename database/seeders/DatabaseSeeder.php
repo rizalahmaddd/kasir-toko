@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\StoreType;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Support\CurrentTenant;
@@ -16,7 +17,7 @@ class DatabaseSeeder extends Seeder
 
     public function run(): void
     {
-        $tenant = Tenant::query()->firstOrCreate(['slug' => 'toko-demo'], ['name' => 'Toko Demo', 'plan' => 'pro', 'onboarded_at' => now()]);
+        $tenant = Tenant::query()->firstOrCreate(['slug' => 'toko-demo'], ['name' => 'Toko Demo', 'plan' => 'pro', 'store_type' => StoreType::Warung, 'onboarded_at' => now()]);
 
         app(CurrentTenant::class)->run($tenant, function () {
             $this->call(RoleSeeder::class);
@@ -29,6 +30,7 @@ class DatabaseSeeder extends Seeder
         });
 
         $this->seedPlatformAdmin();
+        $this->call(PlatformDemoSeeder::class);
     }
 
     /**
