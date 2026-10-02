@@ -45,14 +45,14 @@ Aplikasi ini **multi-tenant (SaaS)**: banyak toko memakai satu instalasi dan sat
 |---|---|
 | Tenant / toko | Satu pelanggan layanan (tabel `tenants`). Semua data bisnis menempel ke toko lewat kolom `tenant_id`. |
 | Pemilik toko | Akun berperan `superadmin` di tokonya: semua menu toko, sakelar fitur, ekspor data. Peran ini tidak berlaku di toko lain. |
-| Admin platform | Akun tanpa toko (`users.tenant_id` kosong, `is_platform_admin`). Hanya bisa membuka panel Platform: daftar toko dan backup database. |
+| Admin platform | Akun tanpa toko (`users.tenant_id` kosong, `is_platform_admin`). Hanya bisa membuka [panel Platform](#panel-platform). |
 | Paket | `trial`, `basic`, `pro` di `config/saas.php`, beserta batas jumlah pengguna dan produk (`null` = tanpa batas). |
 
 Username, email, dan nomor HP unik di seluruh layanan, jadi login tidak perlu kode toko. Kode/nama yang dipakai di dalam toko (SKU, barcode, kode pelanggan, nama kategori, nama peran, nomor transaksi & shift) cukup unik per toko, dan penomoran dokumen (`TRX-2026-0001`) berjalan sendiri-sendiri di tiap toko.
 
 ### Alur toko
 
-1. **Daftar** di `/daftar` (web) atau `POST /api/v1/auth/register` (aplikasi mobile). Toko dibuat beserta peran bawaan (superadmin, admin, kasir, staff) dan akun pemiliknya, lalu langsung masuk ke [persiapan toko](#persiapan-toko-preset-jenis-toko). Masa uji coba diatur dengan `SAAS_TRIAL_DAYS` (default 14 hari).
+1. **Daftar** di `/daftar` (web) atau `POST /api/v1/auth/register` (aplikasi mobile). Toko dibuat beserta peran bawaan (superadmin, admin, kasir, staff) dan akun pemiliknya, lalu langsung masuk ke [persiapan toko](#persiapan-toko-preset-jenis-toko). Lama uji coba dan buka/tutup pendaftaran diatur di **Platform → Pengaturan Layanan**; bawaannya dari `SAAS_TRIAL_DAYS` (14 hari).
 2. **Masa aktif** dihitung dari `trial_ends_at` untuk paket `trial` dan `subscription_ends_at` untuk paket berbayar; kosong berarti tanpa batas.
 3. **Toko diblokir** kalau dinonaktifkan admin platform atau masa aktifnya habis:
    - web: semua halaman dialihkan ke `/langganan`, aksi Livewire di halaman yang masih terbuka ditolak `402`;
@@ -76,7 +76,19 @@ Ada 10 jenis toko: Warung/Kelontong, Minimarket, Kafe, Restoran, Fashion, Toko B
 
 Preset bisa diterapkan lagi dari **Pengaturan → Perusahaan → Jenis Toko** selama toko belum punya transaksi penjualan. Kategori dan produk yang namanya sudah ada dilewati, pengaturan kasir ditimpa.
 
-Pembayaran langganan belum otomatis: admin platform mengubah paket dan masa aktif dari panel **Platform → Toko Pelanggan** (`/platform/toko`), termasuk tombol perpanjang 30 hari dan menonaktifkan toko.
+### Panel Platform
+
+Admin platform langsung masuk ke `/platform`. Pembayaran langganan belum otomatis; semua perubahan langganan dilakukan manual dari panel ini.
+
+| Menu | Isi |
+|---|---|
+| Dashboard (`/platform`) | Jumlah toko aktif, uji coba, habis, dan nonaktif; masa aktif yang habis dalam 7 hari; sebaran paket dan jenis toko; toko paling aktif; pendapatan langganan yang dicatat. |
+| Toko Pelanggan (`/platform/toko`) | Daftar toko, edit paket/masa aktif/status, tombol +30 hari. Nama toko membuka **Detail Toko**: pemilik, pemakaian vs batas paket, omzet, pengguna, riwayat langganan, perpanjang (7 hari–1 tahun), ubah paket, nonaktifkan/aktifkan, reset password pemilik. |
+| Admin Platform (`/platform/admin`) | Tambah/edit akun admin platform dan cabut aksesnya. Akun tidak dihapus supaya jejak audit tetap utuh. |
+| Pengaturan Layanan (`/platform/pengaturan`) | Buka/tutup pendaftaran toko baru (web dan API) dan lama uji coba. |
+| Backup & Restore (`/platform/backup`) | Backup database semua toko. |
+
+Setiap perpanjangan, ganti paket, dan perubahan status lewat `App\Services\TenantSubscriptionManager` dan tercatat di `tenant_subscription_logs`, beserta nominal bayar dan catatan kalau diisi. Batas paket tetap diatur di `config/saas.php`.
 
 ### Membuat admin platform
 
@@ -114,15 +126,25 @@ Aturan yang wajib diikuti:
 
 ## Akun Demo
 
-`php artisan migrate:fresh --seed` membuat toko **Toko Demo** (paket Pro) berisi katalog contoh, riwayat penjualan 6 hari, logo toko contoh (dari `database/seeders/images/branding/`, bisa diganti di Pengaturan Perusahaan), gambar slideshow layar pelanggan, dan akun berikut (password `password`):
+`php artisan migrate:fresh --seed` membuat toko **Toko Demo** (paket Pro, jenis Warung) berisi katalog contoh, riwayat penjualan 6 hari, logo toko contoh (dari `database/seeders/images/branding/`, bisa diganti di Pengaturan Perusahaan), gambar slideshow layar pelanggan, dan akun berikut (password `password`):
 
 | Peran | Login | Akses |
 |---|---|---|
-| Admin platform | `platform` | Panel Platform: daftar toko, paket & masa aktif, backup database |
+| Admin platform | `platform` | Panel Platform: dashboard layanan, toko pelanggan, admin platform, pengaturan layanan, backup |
 | Superadmin (pemilik toko) | `superadmin` | Semua menu toko, termasuk sakelar fitur & ekspor data |
 | Admin (pemilik) | `admin` | Semua menu toko, laporan, pengaturan kasir |
 | Kasir | `kasir` | Layar kasir, shift sendiri, transaksi sendiri, pelunasan kasbon |
 | Staff (gudang) | `staff` | Lihat produk, kelola stok |
+
+Seeder juga membuat toko pelanggan lain supaya panel Platform terisi (`database/seeders/PlatformDemoSeeder.php`). Pemiliknya login dengan password `password`:
+
+| Toko | Login pemilik | Kondisi |
+|---|---|---|
+| Kopi Senja | `kafe` | Kafe, uji coba habis 5 hari lagi, ada transaksi |
+| Warung Bu Sri | `warung` | Warung, paket Basic, ada transaksi dan pembayaran tercatat |
+| Minimarket Sejahtera | `minimarket` | Uji coba sudah habis (toko terblokir) |
+| Butik Anggun | `fashion` | Paket Basic, dinonaktifkan admin platform |
+| Roti Pagi | `bakery` | Baru daftar, belum persiapan toko (untuk mencoba wizard) |
 
 ## Catatan Perangkat
 
