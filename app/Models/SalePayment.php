@@ -3,11 +3,14 @@
 namespace App\Models;
 
 use App\Enums\PaymentMethod;
+use App\Models\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SalePayment extends Model
 {
+    use BelongsToTenant;
+
     public const KIND_SALE = 'sale';
 
     public const KIND_RECEIVABLE = 'receivable';

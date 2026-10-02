@@ -4,6 +4,7 @@ namespace App\Livewire\Settings;
 
 use App\Models\Setting;
 use App\Support\Branding;
+use App\Support\CurrentTenant;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -93,7 +94,7 @@ class CompanyProfile extends Component
         ]);
 
         if ($this->logo) {
-            $path = $this->logo->storeAs('branding', 'logo-'.Str::lower(Str::random(12)).'.'.$this->logo->extension(), 'local');
+            $path = $this->logo->storeAs(app(CurrentTenant::class)->storagePath('branding'), 'logo-'.Str::lower(Str::random(12)).'.'.$this->logo->extension(), 'local');
             $this->deleteStoredLogo();
             Setting::put(Branding::LOGO_KEY, $path);
             $this->logo = null;

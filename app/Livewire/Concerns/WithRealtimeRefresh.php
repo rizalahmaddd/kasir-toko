@@ -2,17 +2,25 @@
 
 namespace App\Livewire\Concerns;
 
+use App\Support\CurrentTenant;
+
 /**
  * Langganan event realtime tanpa menulis ulang boilerplate echo-private di tiap komponen.
  * Konsumen cukup mengembalikan nama event (broadcastAs()) yang relevan dari realtimeEvents();
- * semuanya siaran ke channel privat "dashboard" (App\Events\Concerns\BroadcastsToDashboard).
+ * semuanya siaran ke channel privat milik toko aktif (App\Events\Concerns\BroadcastsToDashboard).
  */
 trait WithRealtimeRefresh
 {
     public function getListeners(): array
     {
+        $channel = app(CurrentTenant::class)->dashboardChannel();
+
+        if ($channel === null) {
+            return [];
+        }
+
         return collect($this->realtimeEvents())
-            ->mapWithKeys(fn (string $event) => ["echo-private:dashboard,.{$event}" => '$refresh'])
+            ->mapWithKeys(fn (string $event) => ["echo-private:{$channel},.{$event}" => '$refresh'])
             ->all();
     }
 

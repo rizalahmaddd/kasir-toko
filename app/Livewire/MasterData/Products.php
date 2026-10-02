@@ -9,11 +9,13 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Services\DocumentNumberGenerator;
 use App\Services\Pos\StockService;
+use App\Support\CurrentTenant;
 use App\Support\NumberFormatter;
+use App\Support\PlanLimits;
+use App\Support\TenantRule;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -94,6 +96,10 @@ class Products extends Component
         $validated = $this->validate();
         $isEditing = (bool) $this->editingId;
 
+        if (! $isEditing) {
+            PlanLimits::ensureCanAdd('products', 'name');
+        }
+
         $attributes = [
             'category_id' => $validated['category_id'] ?: null,
             'sku' => $validated['sku'] ?: $numbers->next('PRD', 5),
@@ -117,7 +123,7 @@ class Products extends Component
 
             if ($this->image) {
                 $old = $product->image_path;
-                $product->image_path = $this->image->store('products', 'public');
+                $product->image_path = $this->image->store(app(CurrentTenant::class)->storagePath('products'), 'public');
                 $old && Storage::disk('public')->delete($old);
             } elseif ($this->removeImage && $product->image_path) {
                 Storage::disk('public')->delete($product->image_path);
@@ -237,9 +243,9 @@ class Products extends Component
     protected function rules(): array
     {
         return [
-            'category_id' => ['nullable', Rule::exists('categories', 'id')],
-            'sku' => ['nullable', 'string', 'max:50', 'regex:/^[A-Z0-9._\-\/]+$/', Rule::unique('products', 'sku')->ignore($this->editingId)],
-            'barcode' => ['nullable', 'string', 'max:64', Rule::unique('products', 'barcode')->ignore($this->editingId)],
+            'category_id' => ['nullable', TenantRule::exists('categories', 'id')],
+            'sku' => ['nullable', 'string', 'max:50', 'regex:/^[A-Z0-9._\-\/]+$/', TenantRule::unique('products', 'sku')->ignore($this->editingId)],
+            'barcode' => ['nullable', 'string', 'max:64', TenantRule::unique('products', 'barcode')->ignore($this->editingId)],
             'name' => ['required', 'string', 'max:150'],
             'unit' => ['required', 'string', 'max:20'],
             'cost_price' => ['nullable', 'integer', 'min:0', 'max:999999999999'],

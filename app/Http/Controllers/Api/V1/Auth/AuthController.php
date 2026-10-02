@@ -4,18 +4,23 @@ namespace App\Http\Controllers\Api\V1\Auth;
 
 use App\Http\Controllers\Api\V1\Controller;
 use App\Http\Requests\Api\V1\Auth\LoginRequest;
+use App\Http\Requests\Api\V1\Auth\RegisterRequest;
 use App\Http\Requests\Api\V1\Auth\SendOtpRequest;
 use App\Http\Requests\Api\V1\Auth\VerifyOtpRequest;
 use App\Http\Resources\V1\Auth\CurrentUserResource;
 use App\Http\Resources\V1\Auth\OtpChallengeResource;
 use App\Http\Resources\V1\Auth\TokenResource;
 use App\Models\User;
+use App\Services\TenantProvisioner;
 use App\Services\WhatsAppOtpService;
+use App\Support\CurrentTenant;
+use App\Support\OpenApi\Attributes\ApiResponse;
 use App\Support\OpenApi\Attributes\ApiTag;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Crypt;
@@ -99,6 +104,23 @@ class AuthController extends Controller
     }
 
     /**
+     * Daftar toko baru.
+     *
+     * Membuat toko (masa uji coba sesuai konfigurasi), peran bawaan, dan akun pemiliknya, lalu
+     * langsung mengembalikan token Bearer seperti login.
+     */
+    #[ApiResponse(TokenResource::class, status: 201)]
+    public function register(RegisterRequest $request, TenantProvisioner $provisioner): JsonResponse
+    {
+        ['owner' => $owner] = $provisioner->provision(
+            $request->string('shop_name')->trim()->value(),
+            $request->safe()->only(['name', 'username', 'email', 'phone', 'password']),
+        );
+
+        return $this->created($this->issueToken($owner, $request->string('device_name')));
+    }
+
+    /**
      * Profil akun yang sedang login.
      *
      * Termasuk peran, izin efektif, dan fitur yang aktif, dipakai untuk menampilkan atau
@@ -137,6 +159,9 @@ class AuthController extends Controller
 
     private function issueToken(User $user, string $deviceName): TokenResource
     {
+        // Login terjadi di route tamu, jadi tenant belum aktif; peran di respons dibaca per tenant.
+        app(CurrentTenant::class)->set($user->tenant_id);
+
         event(new Login('sanctum', $user, false));
 
         return new TokenResource([

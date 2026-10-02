@@ -3,12 +3,15 @@
 namespace App\Models;
 
 use App\Enums\StockMovementType;
+use App\Models\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class StockMovement extends Model
 {
+    use BelongsToTenant;
+
     protected $fillable = [
         'product_id',
         'user_id',

@@ -87,7 +87,7 @@ class Navigation
                             ['label' => 'Layar Pelanggan', 'icon' => 'monitor-smartphone', 'route' => 'settings.customer-display', 'feature' => 'settings.customer-display', 'can' => 'settings.pos.manage', 'keywords' => 'customer display layar kedua monitor pembeli promo slideshow'],
                             ['label' => 'Peran & Perizinan', 'icon' => 'shield-alert', 'route' => 'settings.roles-and-permissions', 'active' => 'settings.roles-and-permissions*', 'feature' => 'settings.roles-and-permissions', 'can' => ['open', Role::class], 'keywords' => 'role permission peran perizinan hak akses user pengguna kasir'],
                             ['label' => 'Pengaturan Fitur', 'icon' => 'toggle-right', 'route' => 'settings.features', 'superadmin' => true, 'keywords' => 'fitur modul aktif nonaktif toggle'],
-                            ['label' => 'Backup & Restore', 'icon' => 'database-backup', 'route' => 'settings.backups', 'active' => 'settings.backups*', 'superadmin' => true, 'keywords' => 'backup cadangan restore pulihkan database'],
+                            ['label' => 'Ekspor Data Toko', 'icon' => 'download', 'route' => 'settings.data-export', 'feature' => 'settings.data-export', 'superadmin' => true, 'keywords' => 'ekspor export unduh download data salinan csv pindah'],
                         ],
                     ],
                 ],
@@ -103,6 +103,10 @@ class Navigation
      */
     public static function forUser(User $user): array
     {
+        if ($user->isPlatformAdmin()) {
+            return self::platformItems();
+        }
+
         $sections = [];
 
         foreach (self::items() as $section) {
@@ -130,6 +134,24 @@ class Navigation
         }
 
         return $sections;
+    }
+
+    /**
+     * Admin platform tidak punya toko, jadi hanya melihat menu pengelolaan layanan.
+     *
+     * @return list<array{label: ?string, items: list<array<string, mixed>>}>
+     */
+    private static function platformItems(): array
+    {
+        return [
+            [
+                'label' => 'Platform',
+                'items' => [
+                    ['label' => 'Toko Pelanggan', 'icon' => 'store', 'route' => 'platform.tenants', 'mobile' => true, 'keywords' => 'tenant toko pelanggan langganan paket suspend'],
+                    ['label' => 'Backup & Restore', 'icon' => 'database-backup', 'route' => 'platform.backups', 'active' => 'platform.backups*', 'mobile' => true, 'keywords' => 'backup cadangan restore pulihkan database'],
+                ],
+            ],
+        ];
     }
 
     /**

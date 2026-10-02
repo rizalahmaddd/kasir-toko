@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Events\CustomerDisplayUpdated;
 use App\Models\User;
 use App\Support\Branding;
+use App\Support\CurrentTenant;
 use App\Support\CustomerDisplaySettings;
 use App\Support\Features;
 use App\Support\PosSettings;
@@ -96,14 +97,20 @@ class CustomerDisplayController extends Controller
         return response()->noContent();
     }
 
+    /**
+     * Layar dibuka tanpa login, jadi tenant diaktifkan dari pemilik kunci sebelum fitur dan
+     * pengaturan layar (milik toko itu) dibaca.
+     */
     private function resolve(string $key): User
     {
-        abort_unless(
-            strlen($key) === 40 && Features::enabled('pos.customer-display') && CustomerDisplaySettings::enabled(),
-            404,
-        );
+        abort_unless(strlen($key) === 40, 404);
 
-        return User::query()->where('display_key', $key)->firstOrFail();
+        $user = User::query()->where('display_key', $key)->firstOrFail();
+        app(CurrentTenant::class)->set($user->tenant_id);
+
+        abort_unless(Features::enabled('pos.customer-display') && CustomerDisplaySettings::enabled(), 404);
+
+        return $user;
     }
 
     /**

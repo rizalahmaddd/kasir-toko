@@ -2,7 +2,9 @@
 
 namespace Database\Seeders;
 
+use App\Models\Tenant;
 use App\Models\User;
+use App\Support\CurrentTenant;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -14,14 +16,30 @@ class DatabaseSeeder extends Seeder
 
     public function run(): void
     {
-        $this->call(RoleSeeder::class);
-        $this->call(PermissionSeeder::class);
-        $this->call(SettingsSeeder::class);
+        $tenant = Tenant::query()->firstOrCreate(['slug' => 'toko-demo'], ['name' => 'Toko Demo', 'plan' => 'pro']);
 
-        $this->seedDemoUsers();
+        app(CurrentTenant::class)->run($tenant, function () {
+            $this->call(RoleSeeder::class);
+            $this->call(SettingsSeeder::class);
 
-        $this->call(MasterDataSeeder::class);
-        $this->call(PosDemoSeeder::class);
+            $this->seedDemoUsers();
+
+            $this->call(MasterDataSeeder::class);
+            $this->call(PosDemoSeeder::class);
+        });
+
+        $this->seedPlatformAdmin();
+    }
+
+    /**
+     * Pengelola platform SaaS: tidak terikat toko mana pun, hanya membuka panel Platform.
+     */
+    protected function seedPlatformAdmin(): void
+    {
+        app(CurrentTenant::class)->run(null, fn () => User::query()->firstOrCreate(
+            ['email' => 'platform@example.test'],
+            ['name' => 'Platform Admin', 'username' => 'platform', 'password' => Hash::make('password')],
+        )->forceFill(['email_verified_at' => now(), 'is_platform_admin' => true])->save());
     }
 
     /**

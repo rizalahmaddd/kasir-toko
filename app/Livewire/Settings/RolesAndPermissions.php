@@ -4,6 +4,9 @@ namespace App\Livewire\Settings;
 
 use App\Models\User;
 use App\Policies\RolePolicy;
+use App\Support\CurrentTenant;
+use App\Support\PlanLimits;
+use App\Support\TenantRule;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
@@ -90,7 +93,7 @@ class RolesAndPermissions extends Component
             $this->tab = $this->availableTabs()[0];
         }
 
-        $roles = Role::orderByRaw("CASE WHEN LOWER(name) = 'superadmin' THEN 0 ELSE 1 END")
+        $roles = $this->roles()->orderByRaw("CASE WHEN LOWER(name) = 'superadmin' THEN 0 ELSE 1 END")
             ->orderBy('id')
             ->pluck('name')
             ->all();
@@ -137,7 +140,7 @@ class RolesAndPermissions extends Component
 
     public function loadSelectedRolePermissions(): void
     {
-        $role = Role::where('name', $this->selectedRoleName)->first();
+        $role = $this->roles()->where('name', $this->selectedRoleName)->first();
 
         if ($role) {
             $this->rolePermissions = $role->permissions()->pluck('name')->all();
@@ -150,7 +153,7 @@ class RolesAndPermissions extends Component
     {
         abort_unless(Auth::user()->can('managePermissions', Role::class), 403);
 
-        $role = Role::where('name', $this->selectedRoleName)->firstOrFail();
+        $role = $this->roles()->where('name', $this->selectedRoleName)->firstOrFail();
         $permissionsBefore = $this->permissionNamesOf($role);
 
         if (in_array($permissionName, $this->rolePermissions, true)) {
@@ -174,7 +177,7 @@ class RolesAndPermissions extends Component
     {
         abort_unless(Auth::user()->can('managePermissions', Role::class), 403);
 
-        $role = Role::where('name', $this->selectedRoleName)->firstOrFail();
+        $role = $this->roles()->where('name', $this->selectedRoleName)->firstOrFail();
         $permissionsBefore = $this->permissionNamesOf($role);
         $modulePermissions = array_keys(PermissionSeeder::PERMISSION_GROUPS[$module] ?? []);
 
@@ -193,7 +196,7 @@ class RolesAndPermissions extends Component
     {
         abort_unless(Auth::user()->can('managePermissions', Role::class), 403);
 
-        $role = Role::where('name', $this->selectedRoleName)->firstOrFail();
+        $role = $this->roles()->where('name', $this->selectedRoleName)->firstOrFail();
         $permissionsBefore = $this->permissionNamesOf($role);
         $modulePermissions = array_keys(PermissionSeeder::PERMISSION_GROUPS[$module] ?? []);
 
@@ -212,7 +215,7 @@ class RolesAndPermissions extends Component
     {
         abort_unless(Auth::user()->can('managePermissions', Role::class), 403);
 
-        $role = Role::where('name', $this->selectedRoleName)->firstOrFail();
+        $role = $this->roles()->where('name', $this->selectedRoleName)->firstOrFail();
         $permissionsBefore = $this->permissionNamesOf($role);
         $allPermissions = Permission::pluck('name')->all();
 
@@ -230,7 +233,7 @@ class RolesAndPermissions extends Component
     {
         abort_unless(Auth::user()->can('managePermissions', Role::class), 403);
 
-        $role = Role::where('name', $this->selectedRoleName)->firstOrFail();
+        $role = $this->roles()->where('name', $this->selectedRoleName)->firstOrFail();
         $permissionsBefore = $this->permissionNamesOf($role);
 
         $role->syncPermissions([]);
@@ -247,7 +250,7 @@ class RolesAndPermissions extends Component
     {
         abort_unless(Auth::user()->can('managePermissions', Role::class), 403);
 
-        $role = Role::where('name', $this->selectedRoleName)->firstOrFail();
+        $role = $this->roles()->where('name', $this->selectedRoleName)->firstOrFail();
         $permissionsBefore = $this->permissionNamesOf($role);
 
         if (! isset(PermissionSeeder::DEFAULT_ROLE_PERMISSIONS[$role->name])) {
@@ -275,7 +278,7 @@ class RolesAndPermissions extends Component
     {
         abort_unless(Auth::user()->can('managePermissions', Role::class), 403);
 
-        $role = Role::findOrFail($roleId);
+        $role = $this->roles()->findOrFail($roleId);
         $permissionsBefore = $this->permissionNamesOf($role);
 
         if ($role->hasPermissionTo($permissionName)) {
@@ -320,7 +323,7 @@ class RolesAndPermissions extends Component
                 'min:3',
                 'max:40',
                 'regex:/^[a-z0-9 ]+$/',
-                Rule::unique('roles', 'name'),
+                TenantRule::unique('roles', 'name'),
             ],
         ], [
             'newRoleName.required' => 'Nama peran wajib diisi.',
@@ -353,7 +356,7 @@ class RolesAndPermissions extends Component
 
     public function openEditRoleModal(int $roleId): void
     {
-        $role = Role::findOrFail($roleId);
+        $role = $this->roles()->findOrFail($roleId);
         abort_unless(Auth::user()->can('update', $role), 403);
 
         if (in_array(strtolower($role->name), RolePolicy::PROTECTED_ROLES, true)) {
@@ -371,7 +374,7 @@ class RolesAndPermissions extends Component
 
     public function updateRole(): void
     {
-        $role = Role::findOrFail($this->editingRoleId);
+        $role = $this->roles()->findOrFail($this->editingRoleId);
         abort_unless(Auth::user()->can('update', $role), 403);
 
         if (in_array(strtolower($role->name), RolePolicy::PROTECTED_ROLES, true)) {
@@ -389,7 +392,7 @@ class RolesAndPermissions extends Component
                 'min:3',
                 'max:40',
                 'regex:/^[a-z0-9 ]+$/',
-                Rule::unique('roles', 'name')->ignore($role->id),
+                TenantRule::unique('roles', 'name')->ignore($role->id),
             ],
         ]);
 
@@ -416,7 +419,7 @@ class RolesAndPermissions extends Component
 
     public function confirmDeleteRole(int $roleId): void
     {
-        $role = Role::findOrFail($roleId);
+        $role = $this->roles()->findOrFail($roleId);
         abort_unless(Auth::user()->can('delete', $role), 403);
 
         if (in_array(strtolower($role->name), RolePolicy::PROTECTED_ROLES, true)) {
@@ -439,7 +442,7 @@ class RolesAndPermissions extends Component
 
     public function deleteRole(): void
     {
-        $role = Role::findOrFail($this->roleToDeleteId);
+        $role = $this->roles()->findOrFail($this->roleToDeleteId);
         abort_unless(Auth::user()->can('delete', $role), 403);
 
         if (in_array(strtolower($role->name), RolePolicy::PROTECTED_ROLES, true)) {
@@ -507,7 +510,7 @@ class RolesAndPermissions extends Component
 
         $user = User::findOrFail($this->editingUserId);
         $this->validate(
-            ['editingUserRoles.*' => ['string', Rule::exists('roles', 'name')]],
+            ['editingUserRoles.*' => ['string', TenantRule::exists('roles', 'name')]],
             ['editingUserRoles.*.exists' => 'Peran yang dipilih tidak dikenal.'],
         );
 
@@ -578,7 +581,7 @@ class RolesAndPermissions extends Component
             'newUserPhone' => User::phoneRules(),
             'newUserPassword' => ['required', 'string', Password::defaults()],
             'newUserRoles' => ['required', 'array', 'min:1'],
-            'newUserRoles.*' => ['string', Rule::exists('roles', 'name')],
+            'newUserRoles.*' => ['string', TenantRule::exists('roles', 'name')],
         ], [
             ...collect(User::identityValidationMessages())->mapWithKeys(fn (string $message, string $key) => ['newUser'.ucfirst($key) => $message])->all(),
             'newUserRoles.required' => 'Pilih minimal satu peran supaya akun ini bisa dipakai.',
@@ -595,6 +598,8 @@ class RolesAndPermissions extends Component
 
             return;
         }
+
+        PlanLimits::ensureCanAdd('users', 'newUserName');
 
         $user = User::create([
             'name' => $validated['newUserName'],
@@ -676,15 +681,26 @@ class RolesAndPermissions extends Component
         return in_array(strtolower($roleName), RolePolicy::PROTECTED_ROLES, true);
     }
 
+    /**
+     * Model Role milik Spatie tidak diberi global scope tenant (cache izinnya memuat peran semua
+     * toko sekaligus), jadi setiap query peran di halaman ini WAJIB lewat sini.
+     *
+     * @return Builder<Role>
+     */
+    private function roles(): Builder
+    {
+        return Role::query()->where('tenant_id', app(CurrentTenant::class)->id());
+    }
+
     public function render()
     {
-        $allRoles = Role::withCount(['users', 'permissions'])
+        $allRoles = $this->roles()->withCount(['users', 'permissions'])
             ->when($this->roleSearch, fn (Builder $q) => $q->where('name', 'like', "%{$this->roleSearch}%"))
             ->orderByRaw("CASE WHEN LOWER(name) = 'superadmin' THEN 0 ELSE 1 END")
             ->orderBy('id')
             ->get();
 
-        $selectedRole = Role::with('users')->where('name', $this->selectedRoleName)->first();
+        $selectedRole = $this->roles()->with('users')->where('name', $this->selectedRoleName)->first();
 
         $permissionGroups = PermissionSeeder::PERMISSION_GROUPS;
 

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\SaleStatus;
 use App\Events\SaleRecorded;
 use App\Models\Concerns\Auditable;
+use App\Models\Concerns\BelongsToTenant;
 use Database\Factories\SaleFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Sale extends Model
 {
     use Auditable;
+    use BelongsToTenant;
 
     /** @use HasFactory<SaleFactory> */
     use HasFactory;

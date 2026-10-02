@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Services\TenantProvisioner;
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Role;
 
 class RoleSeeder extends Seeder
 {
@@ -18,10 +18,11 @@ class RoleSeeder extends Seeder
         'staff',
     ];
 
+    /**
+     * Peran dibuat untuk tenant yang sedang aktif (lihat TenantProvisioner).
+     */
     public function run(): void
     {
-        foreach (self::ROLES as $role) {
-            Role::findOrCreate($role, 'web');
-        }
+        app(TenantProvisioner::class)->seedRoles();
     }
 }

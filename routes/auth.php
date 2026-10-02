@@ -4,10 +4,13 @@ use App\Http\Controllers\Auth\VerifyEmailController;
 use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
 
-// Tidak ada pendaftaran mandiri: akun pegawai dibuat dari Pengaturan > Peran & Perizinan.
+// Pendaftaran membuat toko baru beserta pemiliknya; akun pegawai dibuat dari Pengaturan > Peran & Perizinan.
 Route::middleware('guest')->group(function () {
     Volt::route('login', 'pages.auth.login')
         ->name('login');
+
+    Volt::route('daftar', 'pages.auth.register')
+        ->name('register');
 
     Volt::route('forgot-password', 'pages.auth.forgot-password')
         ->name('password.request');
@@ -17,6 +20,9 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
+    Volt::route('langganan', 'pages.subscription-inactive')
+        ->name('subscription.inactive');
+
     Volt::route('verify-email', 'pages.auth.verify-email')
         ->name('verification.notice');
 

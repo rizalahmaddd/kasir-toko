@@ -9,7 +9,7 @@ use Illuminate\Notifications\Messages\BroadcastMessage;
 use Illuminate\Notifications\Notification;
 
 /**
- * Kabar ke superadmin bahwa backup yang berjalan di antrean sudah selesai atau gagal.
+ * Kabar ke admin platform bahwa backup yang berjalan di antrean sudah selesai atau gagal.
  * Di-queue per channel supaya Reverb yang mati tidak ikut menggagalkan notifikasi lonceng
  * maupun job backupnya.
  */
@@ -40,7 +40,7 @@ class BackupFinishedNotification extends Notification implements ShouldQueue
             'message' => $this->file
                 ? "{$kind} selesai: {$this->file}. Siap diunduh."
                 : "{$kind} gagal: {$this->error}",
-            'url' => route('settings.backups'),
+            'url' => route('platform.backups'),
         ];
     }
 

@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HeldOrder extends Model
 {
+    use BelongsToTenant;
+
     protected $fillable = ['user_id', 'customer_id', 'label', 'cart', 'item_count', 'total'];
 
     /**

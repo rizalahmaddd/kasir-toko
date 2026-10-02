@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Events\CustomerChanged;
 use App\Listeners\NotifyOfNewCustomer;
 use App\Models\Concerns\Auditable;
+use App\Models\Concerns\BelongsToTenant;
 use App\Support\NumberFormatter;
 use Database\Factories\CustomerFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,6 +16,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Customer extends Model
 {
     use Auditable;
+    use BelongsToTenant;
 
     /** @use HasFactory<CustomerFactory> */
     use HasFactory, SoftDeletes;

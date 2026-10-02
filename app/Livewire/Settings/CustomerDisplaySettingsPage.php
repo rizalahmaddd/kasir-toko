@@ -4,6 +4,7 @@ namespace App\Livewire\Settings;
 
 use App\Events\CustomerDisplayUpdated;
 use App\Models\Setting;
+use App\Support\CurrentTenant;
 use App\Support\CustomerDisplaySettings;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -70,7 +71,7 @@ class CustomerDisplaySettingsPage extends Component
         $room = CustomerDisplaySettings::MAX_SLIDES - count($this->slides);
 
         foreach (array_slice($this->newSlides, 0, max(0, $room)) as $file) {
-            $this->slides[] = $file->store('display', 'public');
+            $this->slides[] = $file->store(app(CurrentTenant::class)->storagePath('display'), 'public');
         }
 
         if (count($this->newSlides) > $room) {

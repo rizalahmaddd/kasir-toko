@@ -11,11 +11,10 @@ use App\Models\Product;
 use App\Models\Sale;
 use App\Services\DocumentNumberGenerator;
 use App\Support\PosSettings;
-use Database\Seeders\DatabaseSeeder;
 use Livewire\Livewire;
 
 test('admin can open every pos page with demo data', function () {
-    $this->seed(DatabaseSeeder::class);
+    seedDemoTenant();
     actingAsAdmin();
 
     $sale = Sale::query()->first();

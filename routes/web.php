@@ -30,3 +30,4 @@ require __DIR__.'/pos.php';
 require __DIR__.'/master-data.php';
 require __DIR__.'/reports.php';
 require __DIR__.'/settings.php';
+require __DIR__.'/platform.php';

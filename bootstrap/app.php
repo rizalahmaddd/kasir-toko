@@ -2,6 +2,8 @@
 
 use App\Http\Middleware\EnsureApiFeatureEnabled;
 use App\Http\Middleware\EnsureFeatureEnabled;
+use App\Http\Middleware\EnsureTenantAccess;
+use App\Http\Middleware\IdentifyTenant;
 use App\Services\Pos\PosException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
@@ -32,7 +34,13 @@ return Application::configure(basePath: dirname(__DIR__))
             'feature' => EnsureApiFeatureEnabled::class,
         ]);
         $middleware->web(append: [
+            IdentifyTenant::class,
+            EnsureTenantAccess::class,
             EnsureFeatureEnabled::class,
+        ]);
+        $middleware->api(append: [
+            IdentifyTenant::class.':sanctum',
+            EnsureTenantAccess::class.':sanctum',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

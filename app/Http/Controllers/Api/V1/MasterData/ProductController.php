@@ -10,9 +10,11 @@ use App\Http\Resources\V1\MasterData\ProductResource;
 use App\Models\Product;
 use App\Services\DocumentNumberGenerator;
 use App\Services\Pos\StockService;
+use App\Support\CurrentTenant;
 use App\Support\OpenApi\Attributes\ApiQuery;
 use App\Support\OpenApi\Attributes\ApiResponse;
 use App\Support\OpenApi\Attributes\ApiTag;
+use App\Support\PlanLimits;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -76,6 +78,7 @@ class ProductController extends Controller
     public function store(ProductRequest $request, DocumentNumberGenerator $numbers, StockService $stock): ProductResource
     {
         $data = $request->validated();
+        PlanLimits::ensureCanAdd('products', 'name');
 
         $product = DB::transaction(function () use ($data, $numbers, $stock, $request) {
             $product = Product::create([
@@ -133,7 +136,7 @@ class ProductController extends Controller
     public function uploadImage(ProductImageRequest $request, Product $product): ProductResource
     {
         $old = $product->image_path;
-        $product->update(['image_path' => $request->file('image')->store('products', 'public')]);
+        $product->update(['image_path' => $request->file('image')->store(app(CurrentTenant::class)->storagePath('products'), 'public')]);
 
         if ($old) {
             Storage::disk('public')->delete($old);

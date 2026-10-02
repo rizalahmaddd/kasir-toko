@@ -1,6 +1,9 @@
 <?php
 
+use App\Models\Tenant;
 use App\Models\User;
+use App\Support\CurrentTenant;
+use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -55,6 +58,7 @@ expect()->extend('toBeOne', function () {
  */
 function actingAsRole(string $role): User
 {
+    test()->useDefaultTenant();
     $user = User::factory()->create();
     $user->assignRole(seededRole($role));
     test()->actingAs($user);
@@ -86,6 +90,7 @@ function seededRole(string $name): Role
  */
 function apiActingAs(string $role): User
 {
+    test()->useDefaultTenant();
     $user = User::factory()->create();
     $user->assignRole(seededRole($role));
     Sanctum::actingAs($user);
@@ -101,4 +106,39 @@ function actingAsAdmin(): User
 function actingAsSuperAdmin(): User
 {
     return actingAsRole('superadmin');
+}
+
+/**
+ * Pengelola layanan SaaS: tanpa toko, hanya boleh membuka panel Platform.
+ */
+function platformAdmin(): User
+{
+    return app(CurrentTenant::class)->run(null, function () {
+        $user = User::factory()->create();
+        $user->forceFill(['is_platform_admin' => true])->save();
+
+        return $user;
+    });
+}
+
+function actingAsPlatformAdmin(): User
+{
+    $user = platformAdmin();
+    test()->actingAs($user);
+
+    return $user;
+}
+
+/**
+ * Seluruh data demo (DatabaseSeeder) beserta tenant-nya dijadikan tenant aktif, supaya user dari
+ * actingAsRole() masuk ke toko yang sama dengan data demo.
+ */
+function seedDemoTenant(): Tenant
+{
+    test()->seed(DatabaseSeeder::class);
+
+    $tenant = Tenant::query()->where('slug', 'toko-demo')->sole();
+    app(CurrentTenant::class)->set($tenant);
+
+    return $tenant;
 }

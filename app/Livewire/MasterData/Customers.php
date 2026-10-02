@@ -6,7 +6,7 @@ use App\Livewire\Concerns\WithCrudActions;
 use App\Livewire\Concerns\WithRealtimeRefresh;
 use App\Models\Customer;
 use App\Services\DocumentNumberGenerator;
-use Illuminate\Validation\Rule;
+use App\Support\TenantRule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -156,7 +156,7 @@ class Customers extends Component
     protected function rules(): array
     {
         return [
-            'code' => ['nullable', 'string', 'max:50', Rule::unique('customers', 'code')->ignore($this->editingId)],
+            'code' => ['nullable', 'string', 'max:50', TenantRule::unique('customers', 'code')->ignore($this->editingId)],
             'name' => ['required', 'string', 'max:150'],
             'type' => ['nullable', 'string', 'max:100'],
             'contact_person' => ['nullable', 'string', 'max:150'],

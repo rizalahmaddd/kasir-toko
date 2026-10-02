@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Events\ProductChanged;
 use App\Models\Concerns\Auditable;
+use App\Models\Concerns\BelongsToTenant;
 use Database\Factories\ProductFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -16,6 +17,7 @@ use Illuminate\Support\Facades\Storage;
 class Product extends Model
 {
     use Auditable;
+    use BelongsToTenant;
 
     /** @use HasFactory<ProductFactory> */
     use HasFactory, SoftDeletes;

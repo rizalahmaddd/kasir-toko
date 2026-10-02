@@ -4,11 +4,11 @@ namespace App\Console\Commands;
 
 use App\Models\Setting;
 use App\Models\User;
+use App\Services\TenantProvisioner;
 use App\Support\Branding;
+use App\Support\CurrentTenant;
 use Database\Seeders\MasterDataSeeder;
-use Database\Seeders\PermissionSeeder;
 use Database\Seeders\PosDemoSeeder;
-use Database\Seeders\RoleSeeder;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -26,38 +26,42 @@ use function Laravel\Prompts\text;
     {--username= : Username akun superadmin}
     {--password= : Password akun superadmin}
     {--demo : Isi juga data demo (pelanggan & produk contoh)}')]
-#[Description('Siapkan project baru: migrasi, peran & izin, branding, dan akun superadmin pertama')]
+#[Description('Siapkan project baru: migrasi, peran & izin, toko pertama beserta branding, dan akun superadmin-nya')]
 class InstallApp extends Command
 {
-    public function handle(): int
+    public function handle(TenantProvisioner $provisioner): int
     {
         $this->components->info('Menyiapkan aplikasi baru.');
 
         $this->call('migrate', ['--force' => true]);
-        $this->callSilently('db:seed', ['--class' => RoleSeeder::class, '--force' => true]);
-        $this->callSilently('db:seed', ['--class' => PermissionSeeder::class, '--force' => true]);
-        $this->components->task('Peran & izin bawaan');
 
         $appName = $this->option('app-name') ?: text('Nama aplikasi', default: (string) config('app.name'), required: true);
         $company = $this->option('company') ?: text('Nama perusahaan (kop surat)', default: $appName, required: true);
 
-        Setting::putMany([
-            Branding::APP_NAME_KEY => $appName,
-            'company_name' => $company,
-        ]);
-        $this->components->task('Branding aplikasi');
+        // Nilai platform dipakai di halaman login, sebelum tenant mana pun dikenali.
+        app(CurrentTenant::class)->run(null, fn () => Setting::put(Branding::APP_NAME_KEY, $appName));
 
-        $user = $this->createSuperadmin();
+        $data = $this->superadminData();
 
-        if ($user === null) {
+        if ($data === null) {
             return self::FAILURE;
         }
 
-        if ($this->option('demo') || ($this->input->isInteractive() && confirm('Isi data demo (pelanggan & produk contoh)?', default: false))) {
-            $this->callSilently('db:seed', ['--class' => MasterDataSeeder::class, '--force' => true]);
-            $this->callSilently('db:seed', ['--class' => PosDemoSeeder::class, '--force' => true]);
-            $this->components->task('Data demo');
-        }
+        // Toko pertama di instalasi sendiri tidak dibatasi masa uji coba.
+        ['tenant' => $tenant, 'owner' => $user] = $provisioner->provision($company, $data, plan: 'pro');
+        $this->components->task("Toko {$tenant->name} beserta peran & izin bawaan");
+        $this->components->task("Akun superadmin {$user->email}");
+
+        app(CurrentTenant::class)->run($tenant, function () use ($appName) {
+            Setting::put(Branding::APP_NAME_KEY, $appName);
+            $this->components->task('Branding aplikasi');
+
+            if ($this->option('demo') || ($this->input->isInteractive() && confirm('Isi data demo (pelanggan & produk contoh)?', default: false))) {
+                $this->callSilently('db:seed', ['--class' => MasterDataSeeder::class, '--force' => true]);
+                $this->callSilently('db:seed', ['--class' => PosDemoSeeder::class, '--force' => true]);
+                $this->components->task('Data demo');
+            }
+        });
 
         $this->newLine();
         $this->components->info("Selesai. Login sebagai {$user->email} di ".url('/login'));
@@ -65,7 +69,10 @@ class InstallApp extends Command
         return self::SUCCESS;
     }
 
-    private function createSuperadmin(): ?User
+    /**
+     * @return array{name: string, email: string, username: string, password: string}|null
+     */
+    private function superadminData(): ?array
     {
         $data = [
             'name' => $this->option('name') ?: text('Nama superadmin', required: true),
@@ -90,12 +97,6 @@ class InstallApp extends Command
             return null;
         }
 
-        $user = User::create($data);
-        $user->forceFill(['email_verified_at' => now()])->save();
-        $user->assignRole('superadmin');
-
-        $this->components->task("Akun superadmin {$user->email}");
-
-        return $user;
+        return $data;
     }
 }

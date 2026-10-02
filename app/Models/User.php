@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\Auditable;
+use App\Models\Concerns\BelongsToTenant;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -22,6 +23,7 @@ use Spatie\Permission\Traits\HasRoles;
 class User extends Authenticatable
 {
     use Auditable;
+    use BelongsToTenant;
 
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, HasRoles, Notifiable;
@@ -36,6 +38,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_platform_admin' => 'boolean',
         ];
     }
 
@@ -105,6 +108,14 @@ class User extends Authenticatable
     public function isSuperAdmin(): bool
     {
         return $this->hasRole('superadmin');
+    }
+
+    /**
+     * Pengelola layanan SaaS: tidak terikat toko, hanya membuka panel Platform.
+     */
+    public function isPlatformAdmin(): bool
+    {
+        return $this->tenant_id === null && $this->is_platform_admin;
     }
 
     /**

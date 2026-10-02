@@ -6,6 +6,7 @@ use App\Enums\CashMovementType;
 use App\Enums\PaymentMethod;
 use App\Enums\SaleStatus;
 use App\Models\Concerns\Auditable;
+use App\Models\Concerns\BelongsToTenant;
 use Database\Factories\CashShiftFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -16,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class CashShift extends Model
 {
     use Auditable;
+    use BelongsToTenant;
 
     /** @use HasFactory<CashShiftFactory> */
     use HasFactory;

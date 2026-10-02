@@ -20,7 +20,7 @@ class DocumentNumberGenerator
         return DB::transaction(function () use ($prefix, $year, $key, $pad) {
             DocumentSequence::query()->firstOrCreate(['key' => $key], ['next_number' => 1]);
 
-            $sequence = DocumentSequence::query()->whereKey($key)->lockForUpdate()->firstOrFail();
+            $sequence = DocumentSequence::query()->where('key', $key)->lockForUpdate()->firstOrFail();
             $number = $sequence->next_number;
 
             $sequence->update(['next_number' => $number + 1]);

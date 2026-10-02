@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Services\DocumentNumberGenerator;
 use App\Support\NumberFormatter;
 use App\Support\PosSettings;
+use App\Support\TenantRule;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -280,7 +281,7 @@ class SaleService
     {
         return [
             'client_uuid' => ['required', 'uuid'],
-            'customer_id' => ['nullable', 'integer', Rule::exists('customers', 'id')->whereNull('deleted_at')],
+            'customer_id' => ['nullable', 'integer', TenantRule::exists('customers', 'id')->whereNull('deleted_at')],
             'items' => ['required', 'array', 'min:1', 'max:300'],
             'items.*.product_id' => ['required', 'integer'],
             'items.*.quantity' => ['required', 'numeric', 'gt:0', 'max:99999'],

@@ -213,7 +213,7 @@
                                 <x-table.td data-label="Ukuran" align="right" class="font-mono text-slate-300 whitespace-nowrap">{{ Number::fileSize($file['size'], precision: 1) }}</x-table.td>
                                 <x-table.td data-label="Aksi" align="right">
                                     <div class="inline-flex items-center gap-1">
-                                        <a href="{{ route('settings.backups.download', $file['name']) }}" aria-label="Unduh {{ $file['name'] }}" title="Unduh"
+                                        <a href="{{ route('platform.backups.download', $file['name']) }}" aria-label="Unduh {{ $file['name'] }}" title="Unduh"
                                             class="inline-flex items-center justify-center shrink-0 w-11 h-11 sm:w-8 sm:h-8 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 transition">
                                             <i data-lucide="download" aria-hidden="true" class="w-4 h-4"></i>
                                         </a>

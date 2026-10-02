@@ -17,7 +17,7 @@ use Spatie\Permission\Models\Permission;
 class CurrentUserResource extends JsonResource
 {
     /**
-     * @return array{id: int, name: string, username: string|null, email: string, phone: string|null, roles: list<string>, permissions: list<string>, is_superadmin: bool, enabled_features: list<string>}
+     * @return array{id: int, name: string, username: string|null, email: string, phone: string|null, roles: list<string>, permissions: list<string>, is_superadmin: bool, enabled_features: list<string>, tenant: TenantResource|null}
      */
     public function toArray(Request $request): array
     {
@@ -33,6 +33,7 @@ class CurrentUserResource extends JsonResource
                 : $this->getAllPermissions()->pluck('name')->sort()->values()->all(),
             'is_superadmin' => $this->isSuperAdmin(),
             'enabled_features' => self::enabledFeatures(),
+            'tenant' => $this->tenant ? new TenantResource($this->tenant) : null,
         ];
     }
 

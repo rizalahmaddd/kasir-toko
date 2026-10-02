@@ -4,7 +4,7 @@ namespace App\Livewire\MasterData;
 
 use App\Livewire\Concerns\WithCrudActions;
 use App\Models\Category;
-use Illuminate\Validation\Rule;
+use App\Support\TenantRule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -86,7 +86,7 @@ class Categories extends Component
     protected function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:100', Rule::unique('categories', 'name')->ignore($this->editingId)],
+            'name' => ['required', 'string', 'max:100', TenantRule::unique('categories', 'name')->ignore($this->editingId)],
             'sort_order' => ['required', 'integer', 'min:0', 'max:9999'],
             'is_active' => ['boolean'],
         ];

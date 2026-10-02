@@ -3,7 +3,6 @@
 use App\Livewire\Layout\NotificationBell;
 use App\Livewire\Settings\FeatureToggles;
 use App\Support\Features;
-use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\Route;
@@ -190,7 +189,7 @@ test('every page still renders when every other feature is switched off', functi
 });
 
 test('every detail page still renders with seeded data when every other feature is switched off', function () {
-    $this->seed(DatabaseSeeder::class);
+    seedDemoTenant();
     actingAsSuperAdmin();
 
     $allFeatures = collect(Features::MODULES)
@@ -277,7 +276,7 @@ test('feature toggles bulk actions and reset changes operate properly', function
 
 test('every app route belongs to a feature unless it is deliberately always open', function () {
     $alwaysOpen = [
-        'dashboard', 'profile', 'settings.features', 'settings.backups*', 'branding.logo',
+        'dashboard', 'profile', 'settings.features', 'platform.*', 'subscription.inactive', 'branding.logo',
         'login', 'register', 'password.*', 'verification.*',
         '*livewire.*', 'boost.*', 'storage.*',
         // API routes name their feature through the `feature:` middleware instead (tests/Feature/Api/ApiDocumentationTest.php).

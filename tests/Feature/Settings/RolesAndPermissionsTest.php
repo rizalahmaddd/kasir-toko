@@ -29,7 +29,13 @@ test('superadmin can open every page regardless of permissions', function () {
 
     $this->get(route('reports.activity-log'))->assertOk();
     $this->get(route('master-data.customers'))->assertOk();
-    $this->get(route('settings.backups'))->assertOk();
+});
+
+test('a shop superadmin cannot open the platform panel', function () {
+    actingAsSuperAdmin();
+
+    $this->get(route('platform.tenants'))->assertForbidden();
+    $this->get(route('platform.backups'))->assertForbidden();
 });
 
 test('guests cannot view roles and permissions management', function () {

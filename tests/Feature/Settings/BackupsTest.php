@@ -60,19 +60,19 @@ function zipEntries(string $name): array
     return $entries;
 }
 
-test('only superadmin can open the backup page and download backups', function () {
-    actingAsSuperAdmin();
+test('only platform admins can open the backup page and download backups', function () {
+    actingAsPlatformAdmin();
     $name = backupService()->create();
-    $this->get(route('settings.backups'))->assertOk()->assertSee($name);
+    $this->get(route('platform.backups'))->assertOk()->assertSee($name);
 
     actingAsAdmin();
-    $this->get(route('settings.backups'))->assertForbidden();
-    $this->get(route('settings.backups.download', $name))->assertForbidden();
+    $this->get(route('platform.backups'))->assertForbidden();
+    $this->get(route('platform.backups.download', $name))->assertForbidden();
     Livewire::test(Backups::class)->assertForbidden();
 });
 
 test('superadmin restores the database after data changed', function () {
-    actingAsSuperAdmin();
+    actingAsPlatformAdmin();
     $tricky = User::factory()->create(['name' => "O'Brien; DROP TABLE users; -- \\ \n baris dua"]);
     $backup = backupService()->create();
 
@@ -84,7 +84,7 @@ test('superadmin restores the database after data changed', function () {
         ->set('password', 'password')
         ->call('restore')
         ->assertHasNoErrors()
-        ->assertRedirect(route('settings.backups'));
+        ->assertRedirect(route('platform.backups'));
 
     expect(User::find($tricky->id)?->name)->toBe($tricky->name)
         ->and(User::find($added->id))->toBeNull()
@@ -92,7 +92,7 @@ test('superadmin restores the database after data changed', function () {
 });
 
 test('restore requires the superadmin password', function () {
-    actingAsSuperAdmin();
+    actingAsPlatformAdmin();
     $backup = backupService()->create();
     $added = User::factory()->create();
 
@@ -116,7 +116,7 @@ test('files backup packs application code but skips rebuildable folders and secr
 });
 
 test('full backup restores its database part and files backups cannot be restored here', function () {
-    actingAsSuperAdmin();
+    actingAsPlatformAdmin();
     $full = backupService()->create('full');
     $filesOnly = backupService()->create('files');
     $added = User::factory()->create();
@@ -132,7 +132,7 @@ test('full backup restores its database part and files backups cannot be restore
 });
 
 test('uploaded files must be backups made by this app', function () {
-    actingAsSuperAdmin();
+    actingAsPlatformAdmin();
 
     Livewire::test(Backups::class)
         ->set('upload', UploadedFile::fake()->createWithContent('dump.sql', "DROP TABLE users;\n"))
@@ -155,10 +155,10 @@ test('uploaded files must be backups made by this app', function () {
 });
 
 test('backup file names cannot escape the backup directory', function () {
-    actingAsSuperAdmin();
+    actingAsPlatformAdmin();
     Storage::disk('local')->put('secret.sql', '-- rahasia');
 
-    $this->get(route('settings.backups.download', '..%2Fsecret.sql'))->assertNotFound();
+    $this->get(route('platform.backups.download', '..%2Fsecret.sql'))->assertNotFound();
 
     Livewire::test(Backups::class)
         ->call('confirmDelete', '../secret.sql')
@@ -169,7 +169,7 @@ test('backup file names cannot escape the backup directory', function () {
 
 test('manual backup is queued once with the chosen scope', function () {
     Queue::fake();
-    $superadmin = actingAsSuperAdmin();
+    $superadmin = actingAsPlatformAdmin();
 
     Livewire::test(Backups::class)
         ->set('scope', 'full')
@@ -184,8 +184,8 @@ test('manual backup is queued once with the chosen scope', function () {
 
 test('queued manual backup notifies only the superadmin who requested it', function () {
     Notification::fake();
-    $superadmin = actingAsSuperAdmin();
-    $otherSuperadmin = User::factory()->create()->assignRole('superadmin');
+    $superadmin = actingAsPlatformAdmin();
+    $otherSuperadmin = platformAdmin();
     Cache::put(CreateBackup::PENDING_KEY, ['scope' => 'database', 'since' => now()->toIso8601String()]);
 
     (new CreateBackup('database', $superadmin->id))->handle(backupService());
@@ -197,7 +197,7 @@ test('queued manual backup notifies only the superadmin who requested it', funct
 
 test('scheduled backup keeps only its own newest backups and records the result', function () {
     Notification::fake();
-    $superadmins = collect([actingAsSuperAdmin(), User::factory()->create()->assignRole('superadmin')]);
+    $superadmins = collect([actingAsPlatformAdmin(), platformAdmin()]);
     $schedule = BackupSchedule::factory()->create(['keep' => 2]);
     $other = BackupSchedule::factory()->create();
 
@@ -227,7 +227,7 @@ test('scheduled backup keeps only its own newest backups and records the result'
 
 test('a failed scheduled backup is recorded and every superadmin is told why', function () {
     Notification::fake();
-    $superadmin = actingAsSuperAdmin();
+    $superadmin = actingAsPlatformAdmin();
     $schedule = BackupSchedule::factory()->create();
 
     (new CreateBackup('database', scheduleId: $schedule->id))->failed(new RuntimeException('Disk penuh'));
@@ -238,7 +238,7 @@ test('a failed scheduled backup is recorded and every superadmin is told why', f
 });
 
 test('superadmin creates a daily schedule with several times', function () {
-    actingAsSuperAdmin();
+    actingAsPlatformAdmin();
 
     Livewire::test(Backups::class)
         ->call('openScheduleModal')
@@ -259,7 +259,7 @@ test('superadmin creates a daily schedule with several times', function () {
 });
 
 test('schedule form rejects duplicate times and weekly schedules without days', function () {
-    actingAsSuperAdmin();
+    actingAsPlatformAdmin();
 
     Livewire::test(Backups::class)
         ->set('scheduleName', 'Mingguan')

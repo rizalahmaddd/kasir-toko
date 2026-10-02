@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests\Api\V1\MasterData;
 
+use App\Support\TenantRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class ProductRequest extends FormRequest
 {
@@ -30,9 +30,9 @@ class ProductRequest extends FormRequest
         $id = $this->route('product')?->id;
 
         return [
-            'category_id' => ['nullable', 'integer', Rule::exists('categories', 'id')],
-            'sku' => ['nullable', 'string', 'max:50', 'regex:/^[A-Z0-9._\-\/]+$/', Rule::unique('products', 'sku')->ignore($id)],
-            'barcode' => ['nullable', 'string', 'max:64', Rule::unique('products', 'barcode')->ignore($id)],
+            'category_id' => ['nullable', 'integer', TenantRule::exists('categories', 'id')],
+            'sku' => ['nullable', 'string', 'max:50', 'regex:/^[A-Z0-9._\-\/]+$/', TenantRule::unique('products', 'sku')->ignore($id)],
+            'barcode' => ['nullable', 'string', 'max:64', TenantRule::unique('products', 'barcode')->ignore($id)],
             'name' => ['required', 'string', 'max:150'],
             'unit' => ['required', 'string', 'max:20'],
             'cost_price' => ['nullable', 'integer', 'min:0', 'max:999999999999'],

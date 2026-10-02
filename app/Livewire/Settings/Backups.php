@@ -69,7 +69,7 @@ class Backups extends Component
 
     public function mount(): void
     {
-        $this->authorizeSuperAdmin();
+        $this->authorizePlatformAdmin();
 
         if ($this->scopeFilter !== 'all' && ! array_key_exists($this->scopeFilter, BackupService::SCOPES)) {
             $this->scopeFilter = 'all';
@@ -78,7 +78,7 @@ class Backups extends Component
 
     public function createBackup(): void
     {
-        $this->authorizeSuperAdmin();
+        $this->authorizePlatformAdmin();
         $this->validate(['scope' => ['required', Rule::in(array_keys(BackupService::SCOPES))]]);
 
         if (Cache::has(CreateBackup::PENDING_KEY)) {
@@ -95,7 +95,7 @@ class Backups extends Component
 
     public function openScheduleModal(?int $id = null): void
     {
-        $this->authorizeSuperAdmin();
+        $this->authorizePlatformAdmin();
         $this->resetValidation();
         $this->resetScheduleForm();
 
@@ -137,7 +137,7 @@ class Backups extends Component
 
     public function saveSchedule(): void
     {
-        $this->authorizeSuperAdmin();
+        $this->authorizePlatformAdmin();
 
         $this->validate([
             'scheduleName' => ['required', 'string', 'max:100'],
@@ -185,7 +185,7 @@ class Backups extends Component
 
     public function toggleSchedule(int $id): void
     {
-        $this->authorizeSuperAdmin();
+        $this->authorizePlatformAdmin();
 
         $schedule = BackupSchedule::findOrFail($id);
         $schedule->update(['is_active' => ! $schedule->is_active]);
@@ -195,7 +195,7 @@ class Backups extends Component
 
     public function runScheduleNow(int $id): void
     {
-        $this->authorizeSuperAdmin();
+        $this->authorizePlatformAdmin();
 
         $schedule = BackupSchedule::findOrFail($id);
         CreateBackup::dispatch($schedule->scope, Auth::id(), $schedule->id, $schedule->include_secrets);
@@ -205,7 +205,7 @@ class Backups extends Component
 
     public function uploadBackup(BackupService $backups): void
     {
-        $this->authorizeSuperAdmin();
+        $this->authorizePlatformAdmin();
         $this->validate(['upload' => ['required', 'file', 'max:12288']]);
 
         try {
@@ -227,7 +227,7 @@ class Backups extends Component
 
     public function confirmRestore(string $name): void
     {
-        $this->authorizeSuperAdmin();
+        $this->authorizePlatformAdmin();
         $this->resetErrorBag();
         $this->restoring = $name;
         $this->password = '';
@@ -242,7 +242,7 @@ class Backups extends Component
 
     public function restore(BackupService $backups): void
     {
-        $this->authorizeSuperAdmin();
+        $this->authorizePlatformAdmin();
         $this->validate(['password' => ['required', 'current_password']], [
             'password.current_password' => __('Password salah.'),
         ]);
@@ -266,19 +266,19 @@ class Backups extends Component
             'type' => 'success',
         ]);
 
-        $this->redirectRoute('settings.backups');
+        $this->redirectRoute('platform.backups');
     }
 
     public function confirmDelete(string $name): void
     {
-        $this->authorizeSuperAdmin();
+        $this->authorizePlatformAdmin();
         $this->deleting = ['type' => 'file', 'key' => $name];
         $this->dispatch('open-modal', 'confirm-delete');
     }
 
     public function confirmDeleteSchedule(int $id): void
     {
-        $this->authorizeSuperAdmin();
+        $this->authorizePlatformAdmin();
         $this->deleting = ['type' => 'schedule', 'key' => (string) $id];
         $this->dispatch('open-modal', 'confirm-delete');
     }
@@ -290,7 +290,7 @@ class Backups extends Component
 
     public function delete(BackupService $backups): void
     {
-        $this->authorizeSuperAdmin();
+        $this->authorizePlatformAdmin();
 
         if ($this->deleting === null) {
             return;
@@ -395,8 +395,8 @@ class Backups extends Component
         }
     }
 
-    protected function authorizeSuperAdmin(): void
+    protected function authorizePlatformAdmin(): void
     {
-        abort_unless(Auth::user()->isSuperAdmin(), 403);
+        abort_unless(Auth::user()->isPlatformAdmin(), 403);
     }
 }

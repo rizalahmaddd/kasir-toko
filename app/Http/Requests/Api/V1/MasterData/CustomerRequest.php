@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests\Api\V1\MasterData;
 
+use App\Support\TenantRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class CustomerRequest extends FormRequest
 {
@@ -20,7 +20,7 @@ class CustomerRequest extends FormRequest
         $id = $this->route('customer')?->id;
 
         return [
-            'code' => ['required', 'string', 'max:50', Rule::unique('customers', 'code')->ignore($id)],
+            'code' => ['required', 'string', 'max:50', TenantRule::unique('customers', 'code')->ignore($id)],
             'name' => ['required', 'string', 'max:150'],
             'type' => ['nullable', 'string', 'max:100'],
             'contact_person' => ['nullable', 'string', 'max:150'],

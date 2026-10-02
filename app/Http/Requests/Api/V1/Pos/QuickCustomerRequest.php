@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests\Api\V1\Pos;
 
+use App\Support\TenantRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class QuickCustomerRequest extends FormRequest
 {
@@ -27,7 +27,7 @@ class QuickCustomerRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:150'],
-            'phone' => ['nullable', 'string', 'max:30', Rule::unique('customers', 'phone')],
+            'phone' => ['nullable', 'string', 'max:30', TenantRule::unique('customers', 'phone')],
         ];
     }
 

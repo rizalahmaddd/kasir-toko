@@ -15,7 +15,7 @@ class BackupDownloadController extends Controller
 {
     public function __invoke(string $file, BackupService $backups): StreamedResponse
     {
-        abort_unless(auth()->user()->isSuperAdmin(), 403);
+        abort_unless(auth()->user()->isPlatformAdmin(), 403);
 
         try {
             $path = $backups->path($file);

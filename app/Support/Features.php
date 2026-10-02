@@ -139,6 +139,11 @@ class Features
                     'description' => 'Tema, teks sambutan, promo, dan slideshow di layar pelanggan.',
                     'routes' => ['settings.customer-display'],
                 ],
+                'data-export' => [
+                    'label' => 'Ekspor Data Toko',
+                    'description' => 'Unduh seluruh data toko (produk, transaksi, pelanggan, stok) sebagai berkas CSV.',
+                    'routes' => ['settings.data-export*'],
+                ],
                 'roles-and-permissions' => [
                     'label' => 'Peran & Perizinan',
                     'description' => 'Manajemen peran (roles), izin akses (permissions), dan penugasan peran ke pengguna.',

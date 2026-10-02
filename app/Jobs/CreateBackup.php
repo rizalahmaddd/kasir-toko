@@ -94,7 +94,7 @@ class CreateBackup implements ShouldBeUnique, ShouldQueue
     }
 
     /**
-     * Backup manual dikabarkan ke yang memicunya; backup terjadwal ke semua superadmin.
+     * Backup manual dikabarkan ke yang memicunya; backup terjadwal ke semua admin platform.
      *
      * @return Collection<int, User>
      */
@@ -102,9 +102,9 @@ class CreateBackup implements ShouldBeUnique, ShouldQueue
     {
         $requester = $this->requester();
 
-        return $requester?->isSuperAdmin()
+        return $requester?->isPlatformAdmin()
             ? collect([$requester])
-            : User::whereHas('roles', fn ($query) => $query->where('name', 'superadmin'))->get();
+            : User::query()->whereNull('tenant_id')->where('is_platform_admin', true)->get();
     }
 
     private function requester(): ?User

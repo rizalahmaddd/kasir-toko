@@ -2,10 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Services\TenantProvisioner;
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Permission;
-use Spatie\Permission\Models\Role;
-use Spatie\Permission\PermissionRegistrar;
 
 class PermissionSeeder extends Seeder
 {
@@ -109,28 +107,11 @@ class PermissionSeeder extends Seeder
         ],
     ];
 
+    /**
+     * Izin global beserta pemetaannya ke peran tenant yang sedang aktif (lihat TenantProvisioner).
+     */
     public function run(): void
     {
-        app()[PermissionRegistrar::class]->forgetCachedPermissions();
-
-        $allPermissions = [];
-        foreach (self::PERMISSION_GROUPS as $permissions) {
-            foreach ($permissions as $permissionName => $meta) {
-                Permission::findOrCreate($permissionName, 'web');
-                $allPermissions[] = $permissionName;
-            }
-        }
-
-        app()[PermissionRegistrar::class]->forgetCachedPermissions();
-
-        foreach (self::DEFAULT_ROLE_PERMISSIONS as $roleName => $permissions) {
-            $role = Role::findOrCreate($roleName, 'web');
-
-            if ($permissions === ['*']) {
-                $role->syncPermissions($allPermissions);
-            } else {
-                $role->syncPermissions($permissions);
-            }
-        }
+        app(TenantProvisioner::class)->seedRoles();
     }
 }
