@@ -4,6 +4,7 @@ namespace App\Livewire\Platform;
 
 use App\Livewire\Concerns\WithCrudActions;
 use App\Models\Tenant;
+use App\Services\TenantSubscriptionManager;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
@@ -28,42 +29,40 @@ class Tenants extends Component
 
     public string $access_ends_at = '';
 
+    public string $amount = '';
+
+    public string $note = '';
+
     public function updatingStatusFilter(): void
     {
         $this->resetPage();
     }
 
-    public function save(): void
+    public function save(TenantSubscriptionManager $subscriptions): void
     {
         $this->authorizeManage();
 
+        $this->amount = preg_replace('/\D/', '', $this->amount) ?? '';
         $validated = $this->validate();
         $tenant = Tenant::query()->findOrFail($this->editingId);
-        $endsAt = $validated['access_ends_at'] ? Carbon::parse($validated['access_ends_at'])->endOfDay() : null;
 
-        $tenant->update([
+        $subscriptions->update($tenant, [
             'name' => $validated['name'],
             'plan' => $validated['plan'],
             'status' => $validated['status'],
-            ...($validated['plan'] === Tenant::PLAN_TRIAL ? ['trial_ends_at' => $endsAt] : ['subscription_ends_at' => $endsAt]),
-        ]);
+            'access_ends_at' => $validated['access_ends_at'] ? Carbon::parse($validated['access_ends_at']) : null,
+        ], filled($validated['amount']) ? (int) $validated['amount'] : null, $validated['note']);
 
         $this->closeModal();
         $this->notify("Toko {$tenant->name} diperbarui.");
     }
 
-    /**
-     * Perpanjangan dihitung dari akhir masa aktif yang masih berjalan, atau dari hari ini kalau sudah lewat.
-     */
     public function extend(int $id, int $days = 30): void
     {
         $this->authorizeManage();
 
         $tenant = Tenant::query()->findOrFail($id);
-        $column = $tenant->isOnTrial() ? 'trial_ends_at' : 'subscription_ends_at';
-        $from = $tenant->accessEndsAt()?->isFuture() ? $tenant->accessEndsAt() : now();
-
-        $tenant->update([$column => $from->copy()->addDays($days)->endOfDay()]);
+        app(TenantSubscriptionManager::class)->extend($tenant, $days);
 
         $this->notify("Masa aktif {$tenant->name} diperpanjang {$days} hari.");
     }
@@ -100,7 +99,7 @@ class Tenants extends Component
 
     protected function resetForm(): void
     {
-        $this->reset(['name', 'access_ends_at']);
+        $this->reset(['name', 'access_ends_at', 'amount', 'note']);
         $this->plan = Tenant::PLAN_TRIAL;
         $this->status = Tenant::STATUS_ACTIVE;
     }
@@ -114,6 +113,8 @@ class Tenants extends Component
         $this->plan = $record->plan;
         $this->status = $record->status;
         $this->access_ends_at = $record->accessEndsAt()?->toDateString() ?? '';
+        $this->amount = '';
+        $this->note = '';
     }
 
     /**
@@ -131,6 +132,8 @@ class Tenants extends Component
             'plan' => ['required', Rule::in(array_keys(config('saas.plans')))],
             'status' => ['required', Rule::in([Tenant::STATUS_ACTIVE, Tenant::STATUS_SUSPENDED])],
             'access_ends_at' => ['nullable', 'date'],
+            'amount' => ['nullable', 'integer', 'min:0', 'max:1000000000'],
+            'note' => ['nullable', 'string', 'max:255'],
         ];
     }
 }

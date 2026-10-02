@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -33,6 +34,30 @@ class Tenant extends Model
     public function users(): HasMany
     {
         return $this->hasMany(User::class);
+    }
+
+    /**
+     * @return HasMany<TenantSubscriptionLog, $this>
+     */
+    public function subscriptionLogs(): HasMany
+    {
+        return $this->hasMany(TenantSubscriptionLog::class);
+    }
+
+    /**
+     * Pemilik toko: akun superadmin pertama yang dibuat saat pendaftaran. Relasi roles() Spatie
+     * memfilter per team aktif, jadi dari panel platform (tanpa tenant) pivot-nya dibaca langsung.
+     */
+    public function owner(): ?User
+    {
+        $ownerId = DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('model_has_roles.tenant_id', $this->id)
+            ->where('model_has_roles.model_type', (new User)->getMorphClass())
+            ->where('roles.name', 'superadmin')
+            ->min('model_has_roles.model_id');
+
+        return $ownerId ? User::withoutGlobalScopes()->find($ownerId) : null;
     }
 
     public static function uniqueSlug(string $name): string

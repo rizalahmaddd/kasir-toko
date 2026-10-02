@@ -39,7 +39,7 @@
                     @php($reason = $tenant->blockedReason())
                     <x-table.tr wire:key="tenant-{{ $tenant->id }}">
                         <x-table.td>
-                            <div class="font-medium text-slate-100">{{ $tenant->name }}</div>
+                            <a href="{{ route('platform.tenants.show', $tenant) }}" wire:navigate class="font-medium text-slate-100 hover:text-emerald-400 hover:underline">{{ $tenant->name }}</a>
                             <div class="font-mono text-[11px] text-slate-500">{{ $tenant->slug }}</div>
                         </x-table.td>
                         <x-table.td><x-badge :color="$tenant->isOnTrial() ? 'amber' : 'sky'">{{ $tenant->planLabel() }}</x-badge></x-table.td>
@@ -91,6 +91,8 @@
                 <p class="mt-1 text-[11px] text-slate-500">Kosongkan untuk tanpa batas waktu.</p>
                 <x-input-error :messages="$errors->get('access_ends_at')" class="mt-1.5" />
             </div>
+            @include('livewire.platform.partials.payment-fields')
+            <p class="-mt-2 text-[11px] text-slate-500">Isi kalau perubahan ini disertai pembayaran. Tercatat di riwayat langganan toko.</p>
             <div>
                 <x-input-label for="status" value="Status *" />
                 <x-select id="status" wire:model="status">
