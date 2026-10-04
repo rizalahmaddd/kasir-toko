@@ -1,0 +1,106 @@
+name: 🚀 Deploy to Production
+
+# Manual by default so a fresh repository created from the template never deploys by accident.
+# Set the repository variable DEPLOY_PATH (and optionally PHP_BIN), then add a `push` trigger
+# for `main` once the self-hosted runner is ready.
+on:
+  workflow_dispatch:
+    inputs:
+      fresh_seed:
+        description: 'Jalankan migrate:fresh --seed (HAPUS & isi ulang database)'
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+env:
+  DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+  PHP_BIN: ${{ vars.PHP_BIN || '/usr/bin/php' }}
+
+jobs:
+  deploy:
+    name: Deploy ${{ github.event.repository.name }}
+    runs-on: self-hosted
+    environment: production
+    timeout-minutes: 15
+
+    steps:
+      - name: 🧭 Check deploy target
+        run: |
+          if [ -z "${{ env.DEPLOY_PATH }}" ]; then
+            echo "Set the DEPLOY_PATH repository variable first."
+            exit 1
+          fi
+
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v7
+
+      - name: 🔒 Enable maintenance mode
+        run: ${{ env.PHP_BIN }} ${{ env.DEPLOY_PATH }}/artisan down --retry=10 --refresh=15 || true
+
+      - name: 📦 Sync source code to deployment directory
+        run: |
+          rsync -rl --delete \
+            --exclude='.env' \
+            --exclude='storage/' \
+            --exclude='.git/' \
+            --exclude='node_modules/' \
+            --exclude='vendor/' \
+            --exclude='public/build/' \
+            --exclude='*.user.ini' \
+            --exclude='.user.ini' \
+            --exclude='__MACOSX/' \
+            --exclude='__MACOSX' \
+            --exclude='tests/' \
+            --exclude='phpunit.xml' \
+            --exclude='*.md' \
+            --exclude='*.zip' \
+            ${{ github.workspace }}/ ${{ env.DEPLOY_PATH }}/
+
+
+      - name: 🧩 Install Composer dependencies
+        working-directory: ${{ env.DEPLOY_PATH }}
+        run: composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+
+      - name: 🎨 Install Node dependencies & build assets
+        working-directory: ${{ env.DEPLOY_PATH }}
+        run: |
+          npm ci --prefer-offline
+          npm run build
+
+      - name: 🗄️ Run database migrations
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.fresh_seed }}" = "true" ]; then
+            echo "⚠️ Menjalankan php artisan migrate:fresh --seed --force..."
+            ${{ env.PHP_BIN }} ${{ env.DEPLOY_PATH }}/artisan migrate:fresh --seed --force
+          else
+            echo "ℹ️ Menjalankan php artisan migrate --force..."
+            ${{ env.PHP_BIN }} ${{ env.DEPLOY_PATH }}/artisan migrate --force
+          fi
+
+      - name: ⚡ Optimize Laravel
+        run: |
+          ${{ env.PHP_BIN }} ${{ env.DEPLOY_PATH }}/artisan optimize:clear
+          ${{ env.PHP_BIN }} ${{ env.DEPLOY_PATH }}/artisan optimize
+
+      - name: 🔄 Restart queue workers
+        run: ${{ env.PHP_BIN }} ${{ env.DEPLOY_PATH }}/artisan queue:restart
+
+      - name: ✅ Disable maintenance mode
+        run: ${{ env.PHP_BIN }} ${{ env.DEPLOY_PATH }}/artisan up
+
+      - name: 📋 Deployment summary
+        if: success()
+        run: |
+          echo "✅ Deploy berhasil!"
+          echo "🕐 Waktu   : $(date '+%Y-%m-%d %H:%M:%S WIB')"
+          echo "📝 Commit  : ${{ github.sha }}"
+          echo "💬 Message : ${{ github.event.head_commit.message }}"
+          echo "👤 By      : ${{ github.actor }}"
+
+      - name: 🚨 Rollback — artisan up on failure
+        if: failure()
+        run: ${{ env.PHP_BIN }} ${{ env.DEPLOY_PATH }}/artisan up || true
