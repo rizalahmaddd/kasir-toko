@@ -32,6 +32,9 @@ new #[Layout('layouts.app', ['heading' => 'Persiapan Toko'])] #[Title('Persiapan
 
     public bool $allowNegativeStock = false;
 
+    /** @var list<string> */
+    public array $capabilities = [];
+
     public function mount(): void
     {
         abort_unless(Auth::user()->isSuperAdmin(), 403);
@@ -57,6 +60,18 @@ new #[Layout('layouts.app', ['heading' => 'Persiapan Toko'])] #[Title('Persiapan
         $this->taxLabel = $summary['tax_label'];
         $this->allowCredit = $summary['allow_credit'];
         $this->allowNegativeStock = $summary['allow_negative_stock'];
+        $this->capabilities = StorePresets::capabilities($storeTypeEnum);
+    }
+
+    public function toggleCapability(string $key): void
+    {
+        if (! in_array($key, Features::optInFeatures(), true)) {
+            return;
+        }
+
+        $this->capabilities = in_array($key, $this->capabilities, true)
+            ? array_values(array_diff($this->capabilities, [$key]))
+            : [...$this->capabilities, $key];
     }
 
     public function toggleCategory(string $category): void
@@ -82,7 +97,7 @@ new #[Layout('layouts.app', ['heading' => 'Persiapan Toko'])] #[Title('Persiapan
 
     public function back(): void
     {
-        $this->reset('storeType', 'selectedCategories');
+        $this->reset('storeType', 'selectedCategories', 'capabilities');
     }
 
     public function apply(StorePresetApplier $applier): void
@@ -115,6 +130,7 @@ new #[Layout('layouts.app', ['heading' => 'Persiapan Toko'])] #[Title('Persiapan
                 $validated['includeSampleProducts'],
                 $this->selectedCategories,
                 $customSettings,
+                $this->capabilities,
             );
         } catch (RuntimeException $e) {
             $this->addError('storeType', $e->getMessage());
@@ -157,6 +173,14 @@ new #[Layout('layouts.app', ['heading' => 'Persiapan Toko'])] #[Title('Persiapan
             'sampleProductCount' => $type ? StorePresets::sampleProductCount($type) : 0,
             'settings' => $type ? StorePresets::settingsSummary($type) : null,
             'featureChanges' => $type ? $this->featureChanges($type) : [],
+            'capabilityOptions' => collect(Features::optInFeatures())->map(fn (string $key) => [
+                'key' => $key,
+                'label' => Features::MODULES['business']['features'][explode('.', $key, 2)[1]]['label'],
+                'description' => Features::MODULES['business']['features'][explode('.', $key, 2)[1]]['description'],
+                'recommended' => $type !== null && in_array($key, StorePresets::capabilities($type), true),
+            ])->all(),
+            'attributeLabels' => $type ? array_map(fn ($field) => $field->label, StorePresets::productAttributes($type)) : [],
+            'suggestedUnits' => $type ? StorePresets::suggestedUnits($type) : [],
         ];
     }
 
@@ -282,6 +306,39 @@ new #[Layout('layouts.app', ['heading' => 'Persiapan Toko'])] #[Title('Persiapan
                     @else
                         <p class="text-xs text-slate-400">Jenis toko ini tidak punya produk contoh. Tambahkan produk Anda sendiri dari Master Data.</p>
                     @endif
+                </section>
+
+                <section class="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-3">
+                    <h2 class="text-sm font-bold text-slate-100 flex items-center gap-2"><i data-lucide="briefcase-business" class="w-4 h-4 text-slate-400"></i> Fitur khusus usaha</h2>
+                    <div class="space-y-2">
+                        @foreach ($capabilityOptions as $option)
+                            @php $on = in_array($option['key'], $capabilities, true); @endphp
+                            <button type="button" wire:click="toggleCapability(@js($option['key']))" wire:key="cap-{{ $option['key'] }}" aria-pressed="{{ $on ? 'true' : 'false' }}"
+                                @class([
+                                    'w-full flex items-start gap-3 p-3 min-h-[44px] rounded-xl border text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500',
+                                    'border-emerald-500/50 bg-emerald-500/10' => $on,
+                                    'border-slate-800 bg-slate-800/40 hover:border-slate-700' => ! $on,
+                                ])>
+                                <i data-lucide="{{ $on ? 'square-check' : 'square' }}" @class(['w-4 h-4 mt-0.5 shrink-0', 'text-emerald-400' => $on, 'text-slate-400' => ! $on])></i>
+                                <span class="min-w-0">
+                                    <span class="flex items-center gap-2 text-xs font-semibold text-slate-100">
+                                        {{ $option['label'] }}
+                                        @if ($option['recommended'])
+                                            <x-badge color="emerald">DISARANKAN</x-badge>
+                                        @endif
+                                    </span>
+                                    <span class="block text-[11px] text-slate-400 mt-0.5">{{ $option['description'] }}</span>
+                                </span>
+                            </button>
+                        @endforeach
+                    </div>
+                    @if ($attributeLabels && in_array('business.product-attributes', $capabilities, true))
+                        <p class="text-[11px] text-slate-400"><span class="text-slate-300 font-semibold">Isian produk tambahan:</span> {{ implode(', ', $attributeLabels) }}.</p>
+                    @endif
+                    @if ($suggestedUnits && in_array('business.multi-unit', $capabilities, true))
+                        <p class="text-[11px] text-slate-400"><span class="text-slate-300 font-semibold">Satuan umum:</span> {{ implode(', ', $suggestedUnits) }}.</p>
+                    @endif
+                    <p class="text-[11px] text-slate-400">Bisa dinyalakan atau dimatikan lagi kapan saja di Pengaturan Fitur.</p>
                 </section>
 
                 <section class="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-3">

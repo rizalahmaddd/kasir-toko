@@ -257,6 +257,9 @@ function showSkeleton(url) {
     const main = document.querySelector('main');
     if (!main) return;
 
+    // Redirect setelah simpan bisa memicu ini sesudah halaman tujuan selesai dimuat; skeleton itu tidak akan pernah dilepas.
+    if (new URL(url, window.location.origin).pathname === window.location.pathname) return;
+
     main.querySelector(':scope > .sk-page')?.remove();
 
     const page = document.createElement('div');

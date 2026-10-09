@@ -27,6 +27,7 @@ class ShiftController extends Controller
      * Daftar shift.
      */
     #[ApiQuery('status', description: '`variance` = sudah ditutup dan ada selisih uang.', enum: ['open', 'closed', 'variance'])]
+    #[ApiQuery('outlet_id', description: 'Id outlet atau `all`. Default outlet aktif; outlet lain dan `all` butuh izin `reports.all-outlets`.')]
     #[ApiQuery('cashier_id', 'integer', 'Hanya untuk akun dengan izin `shifts.manage`.')]
     #[ApiResponse(ShiftResource::class, paginated: true)]
     public function index(Request $request): AnonymousResourceCollection
@@ -36,7 +37,8 @@ class ShiftController extends Controller
         $status = $request->query('status');
 
         $shifts = CashShift::query()
-            ->with(['user', 'closer'])
+            ->with(['user', 'closer', 'outlet'])
+            ->forOutlet($this->outletFilterId($request))
             ->withCount(['sales as sales_count' => fn (Builder $query) => $query->completed()])
             ->withSum(['sales as sales_total' => fn (Builder $query) => $query->completed()], 'total')
             ->when(! $canManageAll, fn (Builder $query) => $query->where('user_id', $user->id))

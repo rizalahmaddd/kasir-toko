@@ -12,10 +12,17 @@ class Receipt
 {
     public static function text(Sale $sale): string
     {
-        $sale->loadMissing('items', 'payments', 'cashier');
+        return app(CurrentOutlet::class)->run($sale->outlet_id, fn () => self::build($sale));
+    }
 
+    private static function build(Sale $sale): string
+    {
+        $sale->loadMissing('items', 'payments', 'cashier', 'outlet');
+
+        $outletName = OutletIdentity::for($sale->outlet)['name'];
         $lines = [
             '*'.Branding::companyName().'*',
+            ...($outletName ? [$outletName] : []),
             $sale->number.' · '.$sale->sold_at->translatedFormat('d M Y H:i'),
             '',
         ];

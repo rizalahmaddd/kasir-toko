@@ -3,7 +3,10 @@
 namespace App\Support\Audit;
 
 use App\Models\Customer;
+use App\Models\Modifier;
+use App\Models\ModifierGroup;
 use App\Models\Setting;
+use App\Models\StockCount;
 use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
@@ -58,7 +61,10 @@ class AuditTrail
      */
     public const SUBJECT_LABELS = [
         Customer::class => 'Pelanggan',
+        ModifierGroup::class => 'Grup Pilihan Tambahan',
+        Modifier::class => 'Pilihan Tambahan',
         Setting::class => 'Pengaturan',
+        StockCount::class => 'Stok Opname',
         User::class => 'Pengguna',
         Role::class => 'Peran',
         Tenant::class => 'Toko',

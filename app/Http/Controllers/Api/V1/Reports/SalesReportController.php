@@ -17,7 +17,7 @@ use Illuminate\Support\Carbon;
  * The numbers come from the web SalesReport component itself so the app and the web page can
  * never disagree; only the shaping into JSON lives here.
  */
-#[ApiTag('Laporan Penjualan', 'Laporan', 'Sama dengan halaman Laporan Penjualan di web. Semua endpoint menerima filter `from`, `to` (default awal bulan s/d hari ini), `cashier_id`, `payment_method`, dan `status`.')]
+#[ApiTag('Laporan Penjualan', 'Laporan', 'Sama dengan halaman Laporan Penjualan di web. Semua endpoint menerima filter `from`, `to` (default awal bulan s/d hari ini), `cashier_id`, `payment_method`, `status`, dan `outlet_id` (id outlet atau `all`; bawaannya outlet yang sedang dipakai, outlet lain dan `all` butuh izin `reports.all-outlets`).')]
 class SalesReportController extends Controller
 {
     /**
@@ -172,6 +172,8 @@ class SalesReportController extends Controller
         /** @var SalesReport $report */
         $report = app('livewire')->new('reports.sales-report');
         [$report->from, $report->to] = $from <= $to ? [$from, $to] : [$to, $from];
+        $outletId = $this->outletFilterId($request);
+        $report->outletFilter = $outletId === null ? 'all' : (string) $outletId;
         $report->cashierId = $request->integer('cashier_id') ? (string) $request->integer('cashier_id') : '';
         $report->paymentMethod = (string) $request->query('payment_method', '');
         $report->status = in_array($request->query('status'), ['completed', 'due', 'voided'], true) ? $request->query('status') : '';

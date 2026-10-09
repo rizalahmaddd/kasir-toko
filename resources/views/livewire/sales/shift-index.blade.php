@@ -37,6 +37,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
         <h3 class="text-sm font-bold text-slate-200">{{ $this->canManageAll() ? 'Riwayat shift semua kasir' : 'Riwayat shift Anda' }}</h3>
         <div class="flex flex-wrap gap-2">
+            <x-outlet-filter :choices="$outletChoices" />
             @if ($cashiers->count() > 1)
                 <x-select variant="filter" wire:model.live="cashier" aria-label="Filter kasir">
                     <option value="">Semua kasir</option>
@@ -75,7 +76,7 @@
                     <x-table.tr wire:key="shift-{{ $row->id }}">
                         <x-table.td>
                             <a href="{{ route('shifts.show', $row) }}" wire:navigate class="font-mono font-semibold text-emerald-400 hover:text-emerald-300">{{ $row->number }}</a>
-                            <div class="text-[11px] text-slate-400">{{ $row->opened_at->translatedFormat('d M H:i') }} – {{ $row->closed_at?->translatedFormat($row->closed_at->isSameDay($row->opened_at) ? 'H:i' : 'd M H:i') ?? 'sekarang' }}</div>
+                            <div class="text-[11px] text-slate-400">{{ $row->opened_at->translatedFormat('d M H:i') }} – {{ $row->closed_at?->translatedFormat($row->closed_at->isSameDay($row->opened_at) ? 'H:i' : 'd M H:i') ?? 'sekarang' }}@if (app(\App\Support\CurrentOutlet::class)->isMultiOutlet()) · {{ $row->outlet?->name }}@endif</div>
                         </x-table.td>
                         <x-table.td class="text-slate-300">{{ $row->user->name }}</x-table.td>
                         <x-table.td align="right" class="tabular-nums">

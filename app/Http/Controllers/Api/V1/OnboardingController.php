@@ -32,7 +32,8 @@ class OnboardingController extends Controller
      * Terapkan preset.
      *
      * Hanya pemilik toko (superadmin). Membuat kategori dan produk contoh yang belum ada, mengganti
-     * pengaturan kasir, lalu menandai persiapan toko selesai. Setelah selesai, preset hanya bisa
+     * pengaturan kasir, menyalakan kapabilitas usaha (`capabilities`; tanpa field ini memakai bawaan
+     * preset), lalu menandai persiapan toko selesai. Setelah selesai, preset hanya bisa
      * diterapkan lagi selama toko belum punya transaksi penjualan (422 di `store_type`).
      */
     public function apply(ApplyStorePresetRequest $request, StorePresetApplier $applier): StorePresetResultResource
@@ -45,6 +46,7 @@ class OnboardingController extends Controller
             $request->boolean('include_sample_products', true),
             $request->input('categories'),
             $request->input('settings'),
+            $request->has('capabilities') ? (array) $request->input('capabilities', []) : null,
         ), 'store_type');
 
         return new StorePresetResultResource([...$result, 'tenant' => $tenant->refresh()]);

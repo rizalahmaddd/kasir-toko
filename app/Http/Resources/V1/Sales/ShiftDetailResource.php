@@ -16,7 +16,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 class ShiftDetailResource extends JsonResource
 {
     /**
-     * @return array{id: int, number: string, is_open: bool, cashier: UserSummaryResource, opened_at: string, opening_cash: int, closed_at: string|null, closed_by: UserSummaryResource|null, expected_cash: int|null, counted_cash: int|null, cash_difference: int|null, closing_note: string|null, summary: array{opening: int, cash_sales: int, cash_receivables: int, cash_in: int, cash_out: int, expected: int, sales_count: int, sales_total: int, voided_count: int, non_cash: array<string, int>}, cash_movements: list<CashMovementResource>, abilities: array{close: bool, record_cash: bool}}
+     * @return array{id: int, number: string, is_open: bool, outlet: array{id: int, name: string, code: string}|null, cashier: UserSummaryResource, opened_at: string, opening_cash: int, closed_at: string|null, closed_by: UserSummaryResource|null, expected_cash: int|null, counted_cash: int|null, cash_difference: int|null, closing_note: string|null, summary: array{opening: int, cash_sales: int, cash_receivables: int, cash_in: int, cash_out: int, expected: int, sales_count: int, sales_total: int, voided_count: int, non_cash: array<string, int>}, cash_movements: list<CashMovementResource>, abilities: array{close: bool, record_cash: bool}}
      */
     public function toArray(Request $request): array
     {

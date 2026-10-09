@@ -1,0 +1,245 @@
+{
+    "totals": [
+        {
+            "name": "line and transaction discounts before tax",
+            "lines": [
+                {
+                    "price": 12500,
+                    "quantity": 2,
+                    "discount": 1000
+                },
+                {
+                    "price": 18000,
+                    "quantity": 0.5,
+                    "discount": 0
+                }
+            ],
+            "discount_type": "percent",
+            "discount_value": 10,
+            "tax_rate": 11,
+            "service_rate": 0,
+            "expected": {
+                "subtotal": 33000,
+                "discount_amount": 3300,
+                "service_charge_amount": 0,
+                "tax_amount": 3267,
+                "total": 32967
+            }
+        },
+        {
+            "name": "modifiers add to the unit price and service charge is taxed",
+            "lines": [
+                {
+                    "price": 28000,
+                    "modifiers": 11000,
+                    "quantity": 2,
+                    "discount": 0
+                },
+                {
+                    "price": 22000,
+                    "modifiers": 0,
+                    "quantity": 1,
+                    "discount": 2000
+                }
+            ],
+            "discount_type": null,
+            "discount_value": 0,
+            "tax_rate": 10,
+            "service_rate": 5,
+            "expected": {
+                "subtotal": 98000,
+                "discount_amount": 0,
+                "service_charge_amount": 4900,
+                "tax_amount": 10290,
+                "total": 113190
+            }
+        },
+        {
+            "name": "amount discount, odd rounding on fractional quantity",
+            "lines": [
+                {
+                    "price": 13333,
+                    "modifiers": 1667,
+                    "quantity": 1.333,
+                    "discount": 0
+                },
+                {
+                    "price": 999,
+                    "quantity": 3,
+                    "discount": 99999
+                }
+            ],
+            "discount_type": "amount",
+            "discount_value": 5000.4,
+            "tax_rate": 11,
+            "service_rate": 7.5,
+            "expected": {
+                "subtotal": 19995,
+                "discount_amount": 5000,
+                "service_charge_amount": 1125,
+                "tax_amount": 1773,
+                "total": 17893
+            }
+        },
+        {
+            "name": "discount never exceeds subtotal",
+            "lines": [
+                {
+                    "price": 5000,
+                    "quantity": 1,
+                    "discount": 0
+                }
+            ],
+            "discount_type": "amount",
+            "discount_value": 99999,
+            "tax_rate": 11,
+            "service_rate": 10,
+            "expected": {
+                "subtotal": 5000,
+                "discount_amount": 5000,
+                "service_charge_amount": 0,
+                "tax_amount": 0,
+                "total": 0
+            }
+        }
+    ],
+    "tiers": [
+        {
+            "base": 10000,
+            "tiers": [
+                {
+                    "min": 12,
+                    "price": 9000
+                },
+                {
+                    "min": 24,
+                    "price": 8500
+                }
+            ],
+            "quantity": 11,
+            "expected": 10000
+        },
+        {
+            "base": 10000,
+            "tiers": [
+                {
+                    "min": 12,
+                    "price": 9000
+                },
+                {
+                    "min": 24,
+                    "price": 8500
+                }
+            ],
+            "quantity": 12,
+            "expected": 9000
+        },
+        {
+            "base": 10000,
+            "tiers": [
+                {
+                    "min": 12,
+                    "price": 9000
+                },
+                {
+                    "min": 24,
+                    "price": 8500
+                }
+            ],
+            "quantity": 30,
+            "expected": 8500
+        },
+        {
+            "base": 10000,
+            "tiers": [
+                {
+                    "min": 2.5,
+                    "price": 12000
+                }
+            ],
+            "quantity": 3,
+            "expected": 10000
+        },
+        {
+            "base": 7000,
+            "tiers": [
+                {
+                    "min": 0.5,
+                    "price": 6500
+                }
+            ],
+            "quantity": 0.49995,
+            "expected": 6500
+        },
+        {
+            "base": 7000,
+            "tiers": [],
+            "quantity": 100,
+            "expected": 7000
+        }
+    ],
+    "signatures": [
+        {
+            "line": {
+                "product_id": 5,
+                "unit_id": null,
+                "modifiers": [
+                    {
+                        "id": 9
+                    },
+                    {
+                        "id": 3
+                    }
+                ],
+                "note": " less ice "
+            },
+            "expected": "5:0:3-9:less ice"
+        },
+        {
+            "line": {
+                "product_id": 7,
+                "unit_id": 2,
+                "modifiers": [],
+                "note": null
+            },
+            "expected": "7:2::"
+        }
+    ],
+    "near_expiry": [
+        {
+            "price": 12000,
+            "quantity": 3,
+            "available": 2,
+            "percent": 30,
+            "expected": 7200
+        },
+        {
+            "price": 12000,
+            "quantity": 1,
+            "available": 5,
+            "percent": 25,
+            "expected": 3000
+        },
+        {
+            "price": 9999,
+            "quantity": 0.5,
+            "available": 4,
+            "percent": 33.3,
+            "expected": 1665
+        },
+        {
+            "price": 12000,
+            "quantity": 2,
+            "available": 0,
+            "percent": 30,
+            "expected": 0
+        },
+        {
+            "price": 12000,
+            "quantity": 2,
+            "available": 3,
+            "percent": 0,
+            "expected": 0
+        }
+    ]
+}

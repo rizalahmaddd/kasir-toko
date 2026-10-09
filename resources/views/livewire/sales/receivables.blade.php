@@ -22,6 +22,7 @@
         <p class="text-xs text-slate-400">Transaksi yang dibayar sebagian. Urut dari yang paling lama.</p>
         <div class="flex flex-wrap sm:flex-nowrap items-center gap-2">
             <x-search-input class="basis-full sm:basis-auto sm:w-64" wire:model.live.debounce.400ms="search" placeholder="Cari pelanggan atau no. transaksi..." />
+            <x-outlet-filter :choices="$outletChoices" />
             <x-table.export-button action="export" label="Export" />
         </div>
     </div>

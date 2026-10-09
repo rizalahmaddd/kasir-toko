@@ -3,8 +3,11 @@
 namespace App\Services;
 
 use App\Events\SubscriptionBonusGranted;
+use App\Models\Outlet;
+use App\Models\Scopes\TenantScope;
 use App\Models\Tenant;
 use App\Models\TenantSubscriptionLog;
+use App\Notifications\OutletsLockedNotification;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -42,7 +45,43 @@ class TenantSubscriptionManager
                     SubscriptionBonusGranted::dispatch($tenant, $endsAt, $note);
                 }
             }
+
+            if ($before['plan'] !== $after['plan']) {
+                $this->notifyLockedOutlets($tenant);
+            }
         });
+    }
+
+    /**
+     * Penimpaan batas outlet khusus satu toko (kosong = ikut paket). Pemilik diberi tahu bila
+     * batas baru menyisakan outlet yang terkunci.
+     */
+    public function setOutletOverride(Tenant $tenant, ?int $limit): void
+    {
+        if ($tenant->max_outlets_override === $limit) {
+            return;
+        }
+
+        $tenant->update(['max_outlets_override' => $limit]);
+
+        activity('platform')->performedOn($tenant)->event('update')
+            ->log("Batas outlet {$tenant->name} ".($limit === null ? 'dikembalikan mengikuti paket.' : "diatur khusus menjadi {$limit}."));
+
+        $this->notifyLockedOutlets($tenant);
+    }
+
+    /**
+     * Outlet berlebih tidak dihapus, hanya terkunci; pemilik diberi tahu daftarnya.
+     */
+    private function notifyLockedOutlets(Tenant $tenant): void
+    {
+        $max = $tenant->maxOutlets();
+        $locked = Outlet::query()->withoutGlobalScope(TenantScope::class)
+            ->where('tenant_id', $tenant->id)->active()->byPriority()->skip($max)->take(1000)->pluck('name')->all();
+
+        if ($locked !== [] && ($owner = $tenant->owner())) {
+            $owner->notify(new OutletsLockedNotification($tenant, $locked, $max));
+        }
     }
 
     /**

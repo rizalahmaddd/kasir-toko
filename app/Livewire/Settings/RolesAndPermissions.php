@@ -2,8 +2,11 @@
 
 namespace App\Livewire\Settings;
 
+use App\Models\Outlet;
 use App\Models\User;
 use App\Policies\RolePolicy;
+use App\Services\OutletService;
+use App\Support\CurrentOutlet;
 use App\Support\CurrentTenant;
 use App\Support\PlanLimits;
 use App\Support\TenantRule;
@@ -13,6 +16,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -81,6 +85,16 @@ class RolesAndPermissions extends Component
     public string $newUserPhone = '';
 
     public string $newUserPassword = '';
+
+    public bool $newUserAllOutlets = false;
+
+    /** @var list<int|string> */
+    public array $newUserOutlets = [];
+
+    public bool $editingUserAllOutlets = false;
+
+    /** @var list<int|string> */
+    public array $editingUserOutlets = [];
 
     /** @var list<string> */
     public array $newUserRoles = [];
@@ -500,6 +514,8 @@ class RolesAndPermissions extends Component
 
         $this->editingUserId = $user->id;
         $this->editingUserRoles = $user->roles()->pluck('name')->all();
+        $this->editingUserAllOutlets = (bool) $user->all_outlets;
+        $this->editingUserOutlets = $user->outlets()->pluck('outlets.id')->all();
         $this->showUserRolesModal = true;
         $this->dispatch('open-modal', 'user-roles');
     }
@@ -532,6 +548,16 @@ class RolesAndPermissions extends Component
             }
         }
 
+        if ($this->canAssignOutlets()) {
+            try {
+                app(OutletService::class)->syncUserAccess($user, $this->editingUserAllOutlets, array_map('intval', $this->editingUserOutlets));
+            } catch (ValidationException $exception) {
+                $this->addError('editingUserOutlets', $exception->errors()['outlets'][0]);
+
+                return;
+            }
+        }
+
         $rolesBefore = $user->roles()->pluck('name')->sort()->values()->all();
         $user->syncRoles($this->editingUserRoles);
 
@@ -551,11 +577,20 @@ class RolesAndPermissions extends Component
         $this->dispatch('notify', message: "Penugasan peran untuk {$user->name} berhasil disimpan.");
     }
 
+    /**
+     * Penugasan outlet pengguna hanya diatur oleh yang boleh mengelola outlet, dan hanya relevan di toko multi-outlet.
+     */
+    public function canAssignOutlets(): bool
+    {
+        return Auth::user()->can('outlets.manage') && app(CurrentOutlet::class)->isMultiOutlet();
+    }
+
     public function openCreateUserModal(): void
     {
         abort_unless(Auth::user()->can('manageUserRoles', Role::class), 403);
 
-        $this->reset('newUserName', 'newUserUsername', 'newUserEmail', 'newUserPhone', 'newUserPassword', 'newUserRoles');
+        $this->reset('newUserName', 'newUserUsername', 'newUserEmail', 'newUserPhone', 'newUserPassword', 'newUserRoles', 'newUserAllOutlets');
+        $this->newUserOutlets = array_filter([app(CurrentOutlet::class)->id()]);
         $this->resetValidation();
         $this->dispatch('open-modal', 'create-user');
     }
@@ -601,6 +636,15 @@ class RolesAndPermissions extends Component
 
         PlanLimits::ensureCanAdd('users', 'newUserName');
 
+        $outlets = app(OutletService::class);
+        $multiOutlet = app(CurrentOutlet::class)->isMultiOutlet();
+
+        if ($multiOutlet && $this->canAssignOutlets() && ! $this->newUserAllOutlets && $this->newUserOutlets === []) {
+            $this->addError('newUserOutlets', 'Pilih minimal satu outlet, atau centang "Semua outlet".');
+
+            return;
+        }
+
         $user = User::create([
             'name' => $validated['newUserName'],
             'username' => $validated['newUserUsername'],
@@ -610,6 +654,11 @@ class RolesAndPermissions extends Component
         ]);
         $user->syncRoles($validated['newUserRoles']);
 
+        if ($multiOutlet) {
+            $canAssign = $this->canAssignOutlets();
+            $outlets->syncUserAccess($user, $canAssign && $this->newUserAllOutlets, array_map('intval', $canAssign ? $this->newUserOutlets : array_filter([app(CurrentOutlet::class)->id()])));
+        }
+
         activity('roles')
             ->causedBy(Auth::user())
             ->performedOn($user)
@@ -617,7 +666,7 @@ class RolesAndPermissions extends Component
             ->withProperties(['roles' => $validated['newUserRoles']])
             ->log("Akun pengguna '{$user->name}' dibuat dengan peran: ".implode(', ', $validated['newUserRoles']));
 
-        $this->reset('newUserName', 'newUserUsername', 'newUserEmail', 'newUserPhone', 'newUserPassword', 'newUserRoles');
+        $this->reset('newUserName', 'newUserUsername', 'newUserEmail', 'newUserPhone', 'newUserPassword', 'newUserRoles', 'newUserAllOutlets', 'newUserOutlets');
         $this->dispatch('close-modal', 'create-user');
         $this->dispatch('notify', message: "Akun {$user->name} dibuat. Sampaikan username dan password-nya ke pengguna.");
     }
@@ -734,6 +783,7 @@ class RolesAndPermissions extends Component
             ->paginate(12);
 
         $editingUser = $this->editingUserId ? User::find($this->editingUserId) : null;
+        $outletChoices = $this->canAssignOutlets() ? Outlet::query()->byPriority()->get() : collect();
 
         return view('livewire.settings.roles-and-permissions', [
             'allRoles' => $allRoles,
@@ -742,6 +792,7 @@ class RolesAndPermissions extends Component
             'allPermissionsList' => Permission::all(),
             'users' => $users,
             'editingUser' => $editingUser,
+            'outletChoices' => $outletChoices,
             'totalPermissionsCount' => Permission::count(),
             'totalUsersCount' => User::count(),
             'availableTabs' => $this->availableTabs(),

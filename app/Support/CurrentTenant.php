@@ -38,6 +38,7 @@ class CurrentTenant
         // Peran Spatie disimpan per tenant (teams), dan daftar fitur yang dimatikan ditahan per request.
         setPermissionsTeamId($this->id);
         app()->forgetInstance(Features::DISABLED_KEY);
+        app()->forgetInstance(Features::ENABLED_KEY);
     }
 
     /**

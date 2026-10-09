@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\Pos\CashierController;
 use App\Http\Controllers\Api\V1\Pos\CurrentShiftController;
 use App\Http\Controllers\Api\V1\Pos\HeldOrderController;
+use App\Http\Controllers\Api\V1\Pos\KitchenTicketController;
 use App\Http\Controllers\Api\V1\PrintController;
 use App\Http\Controllers\Api\V1\Sales\ReceivableController;
 use App\Http\Controllers\Api\V1\Sales\SaleController;
@@ -16,6 +17,7 @@ Route::middleware('can:pos.sell')->group(function () {
         Route::get('categories', [CashierController::class, 'categories'])->name('categories');
         Route::get('products', [CashierController::class, 'products'])->name('products');
         Route::get('products/lookup', [CashierController::class, 'lookup'])->name('products.lookup');
+        Route::get('products/{product}/serials', [CashierController::class, 'serials'])->name('products.serials');
         Route::get('customers', [CashierController::class, 'customers'])->name('customers.index');
         Route::post('customers', [CashierController::class, 'storeCustomer'])->name('customers.store');
         Route::get('qris', [CashierController::class, 'qris'])->name('qris');
@@ -50,6 +52,13 @@ Route::middleware('can:pos.sell')->group(function () {
         Route::get('receipt/{sale}', [PrintController::class, 'receipt'])->middleware('feature:pos.cashier')->name('receipt');
         Route::get('shift/{cashShift}', [PrintController::class, 'shift'])->middleware('feature:pos.shifts')->name('shift');
     });
+});
+
+Route::prefix('pos/kitchen-tickets')->name('pos.kitchen-tickets.')->middleware('feature:business.order-type')->group(function () {
+    Route::get('/', [KitchenTicketController::class, 'index'])->name('index');
+    Route::get('{ticket}', [KitchenTicketController::class, 'show'])->name('show');
+    Route::post('{ticket}/done', [KitchenTicketController::class, 'done'])->name('done');
+    Route::post('{ticket}/reopen', [KitchenTicketController::class, 'reopen'])->name('reopen');
 });
 
 Route::prefix('receivables')->name('receivables.')->middleware(['can:receivables.manage', 'feature:pos.receivables', 'pro'])->group(function () {

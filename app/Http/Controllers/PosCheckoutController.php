@@ -28,7 +28,7 @@ class PosCheckoutController extends Controller
             ], 422);
         }
 
-        $sale->load('customer', 'items', 'payments');
+        $sale->load('customer', 'items', 'payments', 'kitchenTickets');
 
         return response()->json([
             'ok' => true,
@@ -41,6 +41,8 @@ class PosCheckoutController extends Controller
                 'due' => $sale->due_amount,
                 'receipt_url' => route('pos.receipt', $sale),
                 'whatsapp_url' => Receipt::whatsappUrl($sale),
+                'order_label' => $sale->orderLabel(),
+                'kitchen_ticket_urls' => $sale->kitchenTickets->map(fn ($ticket) => route('print.kitchen-ticket', $ticket))->values()->all(),
             ],
         ]);
     }

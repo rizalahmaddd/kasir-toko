@@ -125,6 +125,16 @@
                             <x-input-error :messages="$errors->get('payment_term_days')" class="mt-1.5" />
                         </div>
 
+                        <div>
+                            <x-input-label for="credit_limit" value="Batas Kasbon" />
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-xs text-slate-400 font-semibold">Rp</span>
+                                <x-text-input wire:model="credit_limit" id="credit_limit" inputmode="numeric" class="w-full pl-9 font-mono" placeholder="Tanpa batas" />
+                            </div>
+                            <p class="text-[11px] text-slate-400 mt-1">Total kasbon belum lunas maksimal. Kasir tidak bisa mencatat kasbon baru di atas batas ini.</p>
+                            <x-input-error :messages="$errors->get('credit_limit')" class="mt-1.5" />
+                        </div>
+
                         <x-checkbox-card wire:model="is_active" label="Pelanggan Aktif" description="Pelanggan nonaktif tetap tersimpan tapi ditandai di daftar dan pencarian." />
                     </div>
                 </div>

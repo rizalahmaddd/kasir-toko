@@ -28,7 +28,12 @@
             <tbody class="divide-y divide-slate-800/60">
                 @foreach ($categories as $category)
                     <x-table.tr wire:key="category-{{ $category->id }}">
-                        <x-table.td class="font-medium text-slate-100">{{ $category->name }}</x-table.td>
+                        <x-table.td>
+                            <span class="font-medium text-slate-100">{{ $category->name }}</span>
+                            @if ($outletOptions->isNotEmpty() && $category->outlets->isNotEmpty())
+                                <p class="text-[11px] text-slate-400 mt-0.5">Hanya di {{ $category->outlets->pluck('name')->implode(', ') }}</p>
+                            @endif
+                        </x-table.td>
                         <x-table.td class="font-mono text-slate-400">{{ $category->sort_order }}</x-table.td>
                         <x-table.td class="text-slate-300 tabular-nums">
                             <x-feature-link :href="route('master-data.products', ['category' => $category->id])" wire:navigate class="hover:text-emerald-400">{{ $category->products_count }} produk</x-feature-link>
@@ -66,6 +71,21 @@
                 <x-input-error :messages="$errors->get('sort_order')" class="mt-1.5" />
             </div>
             <x-checkbox-card wire:model="is_active" label="Kategori aktif" description="Kategori nonaktif tidak tampil sebagai filter di kasir." />
+            @if ($outletOptions->isNotEmpty())
+                <fieldset class="space-y-2">
+                    <legend class="text-xs font-semibold text-slate-300">Dijual di outlet</legend>
+                    <p class="text-[11px] text-slate-400">Biarkan semua tidak dicentang agar kategori ini tampil di kasir semua outlet.</p>
+                    <div class="grid sm:grid-cols-2 gap-2">
+                        @foreach ($outletOptions as $option)
+                            <label class="flex items-center gap-2.5 min-h-[44px] px-3 rounded-lg border border-slate-800 bg-slate-950 text-xs text-slate-200 cursor-pointer">
+                                <x-checkbox wire:model="outlet_ids" value="{{ $option->id }}" />
+                                {{ $option->name }}
+                            </label>
+                        @endforeach
+                    </div>
+                    <x-input-error :messages="$errors->get('outlet_ids.*')" class="mt-1.5" />
+                </fieldset>
+            @endif
 
             <x-modal-actions>
                 <x-secondary-button wire:click="closeModal">Batal</x-secondary-button>

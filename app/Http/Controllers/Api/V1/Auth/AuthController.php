@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Services\SocialAuthService;
 use App\Services\TenantProvisioner;
 use App\Services\WhatsAppOtpService;
+use App\Support\CurrentOutlet;
 use App\Support\CurrentTenant;
 use App\Support\OpenApi\Attributes\ApiResponse;
 use App\Support\OpenApi\Attributes\ApiTag;
@@ -128,8 +129,8 @@ class AuthController extends Controller
     /**
      * Profil akun yang sedang login.
      *
-     * Termasuk peran, izin efektif, dan fitur yang aktif, dipakai untuk menampilkan atau
-     * menyembunyikan menu di aplikasi.
+     * Termasuk peran, izin efektif, fitur yang aktif, dan daftar outlet yang boleh dipakai (`outlets`,
+     * `current_outlet_id`), dipakai untuk menampilkan atau menyembunyikan menu dan pemilih outlet.
      */
     public function me(Request $request): CurrentUserResource
     {
@@ -225,6 +226,10 @@ class AuthController extends Controller
     {
         // Login terjadi di route tamu, jadi tenant belum aktif; peran di respons dibaca per tenant.
         app(CurrentTenant::class)->set($user->tenant_id);
+
+        if ($user->tenant_id !== null) {
+            app(CurrentOutlet::class)->loadAccess($user);
+        }
 
         event(new Login('sanctum', $user, false));
 

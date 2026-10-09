@@ -2,7 +2,9 @@
     $shift = $this->shift;
     $products = $this->products;
     $hasMore = $products->count() > $limit;
-    $config = $this->config() + ['hasShift' => (bool) $shift];
+    $outletName = app(\App\Support\CurrentOutlet::class)->isMultiOutlet() ? $this->outlet?->name : null;
+    $otherOutletShift = $this->shiftInOtherOutlet;
+    $config = $this->config() + ['hasShift' => (bool) $shift && ! $otherOutletShift && ! $this->outletLocked];
 @endphp
 
 <div x-data="posCashier(@js($config))"
@@ -19,7 +21,7 @@
             </a>
 
             <div class="min-w-0 flex-1">
-                <h1 class="font-bold text-sm sm:text-base text-slate-100 leading-tight truncate">{{ \App\Support\Branding::appName() }}</h1>
+                <h1 class="font-bold text-sm sm:text-base text-slate-100 leading-tight truncate">{{ \App\Support\Branding::appName() }}@if ($outletName)<span class="font-semibold text-slate-400"> · {{ $outletName }}</span>@endif</h1>
                 @if ($shift)
                     <a href="{{ route('shifts.show', $shift) }}" wire:navigate class="block text-[11px] text-slate-400 hover:text-slate-200 truncate">
                         <span class="font-mono">{{ $shift->number }}</span>
@@ -69,9 +71,22 @@
                     <span class="hidden lg:inline">Riwayat</span>
                 </a>
 
+                <div class="hidden md:block"><livewire:layout.outlet-switcher /></div>
                 <x-theme-toggle />
             </div>
         </div>
+
+        @if ($this->outletLocked)
+            <div class="px-4 py-1.5 bg-amber-500/10 border-t border-amber-500/30 text-[11px] text-amber-300 flex items-center gap-2">
+                <i data-lucide="lock" class="w-3.5 h-3.5 shrink-0"></i>
+                <span>Outlet {{ $outletName ?? 'ini' }} terkunci oleh batas paket, jadi tidak bisa menerima transaksi baru. Pindah ke outlet lain atau hubungi pemilik toko.</span>
+            </div>
+        @elseif ($otherOutletShift)
+            <div class="px-4 py-1.5 bg-amber-500/10 border-t border-amber-500/30 text-[11px] text-amber-300 flex items-center gap-2">
+                <i data-lucide="alert-triangle" class="w-3.5 h-3.5 shrink-0"></i>
+                <span>Shift Anda masih terbuka di outlet {{ $otherOutletShift->name }}. Pindah ke outlet itu atau tutup shift tersebut sebelum berjualan di sini.</span>
+            </div>
+        @endif
 
         <div x-show="!online" x-cloak class="px-4 py-1.5 bg-amber-500/10 border-t border-amber-500/30 text-[11px] text-amber-300 flex items-center gap-2">
             <i data-lucide="wifi-off" class="w-3.5 h-3.5 shrink-0"></i>
@@ -141,14 +156,15 @@
                     <div class="grid grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(10.5rem,1fr))] gap-2.5 sm:gap-3">
                         @foreach ($products->take($limit) as $product)
                             @php
-                                $stock = (float) $product->stock;
+                                $stock = $product->outletStock();
                                 $allowNegative = \App\Support\PosSettings::allowNegativeStock();
                                 $out = $product->track_stock && $stock <= 0 && ! $allowNegative;
                                 $negativeStock = $product->track_stock && $stock <= 0 && $allowNegative;
-                                $low = $product->track_stock && ! $out && ! $negativeStock && $stock <= (float) $product->min_stock;
+                                $low = $product->track_stock && ! $out && ! $negativeStock && $stock <= $product->outletMinStock();
+                                $payload = \App\Livewire\Pos\Cashier::productPayload($product);
                             @endphp
                             <button type="button" wire:key="product-{{ $product->id }}"
-                                data-product="{{ json_encode(\App\Livewire\Pos\Cashier::productPayload($product)) }}"
+                                data-product="{{ json_encode($payload) }}"
                                 @click="add(JSON.parse($el.dataset.product))"
                                 @class([
                                     'group relative text-left rounded-xl border p-2 sm:p-2.5 flex flex-col gap-2 transition-all duration-150 active:scale-[0.97] focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 cursor-pointer shadow-sm hover:shadow-md hover:border-slate-700/80 select-none',
@@ -182,6 +198,18 @@
                                         </div>
                                     @endif
 
+                                    {{-- Micro-badges for product capabilities --}}
+                                    <div class="absolute bottom-1.5 left-1.5 flex flex-wrap gap-1 pointer-events-none">
+                                        @if (! empty($payload['variants']))
+                                            <span class="px-1.5 py-0.5 rounded bg-sky-500/90 text-white text-[9px] font-extrabold uppercase shadow-sm">Varian</span>
+                                        @elseif (! empty($payload['modifier_groups']))
+                                            <span class="px-1.5 py-0.5 rounded bg-indigo-500/90 text-white text-[9px] font-extrabold uppercase shadow-sm">Opsi</span>
+                                        @endif
+                                        @if (! empty($payload['serial']))
+                                            <span class="px-1.5 py-0.5 rounded bg-purple-500/90 text-white text-[9px] font-extrabold uppercase shadow-sm">SN</span>
+                                        @endif
+                                    </div>
+
                                     {{-- Cart counter badge --}}
                                     <div x-show="qtyInCart({{ $product->id }}) > 0" x-cloak
                                         class="absolute top-1.5 right-1.5 min-w-[24px] h-6 px-1.5 rounded-full bg-emerald-500 text-white text-xs font-black shadow-md flex items-center justify-center tabular-nums ring-2 ring-slate-900">
@@ -191,13 +219,19 @@
 
                                 {{-- Product Name --}}
                                 <span class="text-xs sm:text-[13px] font-semibold text-slate-100 group-hover:text-emerald-600 dark:group-hover:text-white leading-snug line-clamp-2 min-h-[2rem]">
+                                    @if ($payload['rx'])
+                                        <span class="inline-flex align-middle px-1 rounded bg-rose-500/15 text-rose-400 text-[9px] font-extrabold mr-0.5" title="Wajib resep">R</span>
+                                    @endif
+                                    @if (! empty($payload['units']))
+                                        <span class="inline-flex align-middle px-1 rounded bg-emerald-500/15 text-emerald-400 text-[9px] font-extrabold mr-0.5" title="Tersedia multi-satuan">SATUAN</span>
+                                    @endif
                                     {{ $product->name }}
                                 </span>
 
                                 {{-- Price & Stock Footer --}}
                                 <span class="mt-auto flex items-end justify-between gap-1.5 pt-0.5 border-t border-slate-800/40">
                                     <span class="text-sm sm:text-[15px] font-extrabold text-emerald-600 dark:text-emerald-400 tabular-nums tracking-tight">
-                                        {{ \App\Support\NumberFormatter::currency($product->price) }}
+                                        {{ \App\Support\NumberFormatter::currency($product->effectivePrice()) }}
                                     </span>
                                     @if ($product->track_stock)
                                         <span @class([

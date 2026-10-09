@@ -19,6 +19,7 @@
 
         <div class="flex flex-wrap sm:flex-nowrap items-center gap-2">
             <x-search-input class="basis-full sm:basis-auto sm:w-60" wire:model.live.debounce.400ms="search" placeholder="No. transaksi, pelanggan, produk..." />
+            <x-outlet-filter :choices="$outletChoices" />
             <x-select variant="filter" wire:model.live="status" aria-label="Filter status" class="flex-1 sm:flex-none">
                 <option value="">Semua status</option>
                 <option value="completed">Selesai</option>
@@ -81,7 +82,7 @@
                     <x-table.tr wire:key="sale-{{ $sale->id }}">
                         <x-table.td>
                             <a href="{{ route('sales.show', $sale) }}" wire:navigate class="font-mono font-semibold text-emerald-400 hover:text-emerald-300">{{ $sale->number }}</a>
-                            <div class="text-[11px] text-slate-400">{{ $sale->sold_at->translatedFormat($from === $to ? 'H:i' : 'd M, H:i') }} · {{ $sale->cashier->name }}</div>
+                            <div class="text-[11px] text-slate-400">{{ $sale->sold_at->translatedFormat($from === $to ? 'H:i' : 'd M, H:i') }} · {{ $sale->cashier->name }}@if ($outletChoices->isNotEmpty() || app(\App\Support\CurrentOutlet::class)->isMultiOutlet()) · {{ $sale->outlet?->name }}@endif</div>
                         </x-table.td>
                         <x-table.td class="text-slate-300">
                             {{ $sale->customer?->name ?? 'Umum' }}

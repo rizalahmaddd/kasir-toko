@@ -262,3 +262,19 @@ test('selling does not flood the audit log with product stock updates', function
 
     expect(Activity::query()->whereMorphedTo('subject', $this->product)->where('event', 'updated')->count())->toBe(0);
 });
+
+test('credit beyond the customer limit is refused online but kept from the offline queue', function () {
+    openShiftFor($this->cashier);
+    $customer = Customer::factory()->create(['credit_limit' => 25000]);
+    app(SaleService::class)->checkout($this->cashier, checkoutPayload([line($this->product)], [], ['customer_id' => $customer->id]));
+
+    $payload = checkoutPayload([line($this->product)], [], ['customer_id' => $customer->id]);
+    $error = rejection(fn () => app(SaleService::class)->checkout($this->cashier, $payload));
+
+    expect($error->reason)->toBe('credit_limit_exceeded')
+        ->and($error->context['room'])->toBe(10000);
+
+    $sale = app(SaleService::class)->checkout($this->cashier, [...$payload, 'offline' => true]);
+    expect($sale->flags)->toContain('credit_limit_exceeded')
+        ->and($customer->outstandingBalance())->toBe(30000);
+});

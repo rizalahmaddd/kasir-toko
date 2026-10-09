@@ -38,6 +38,10 @@
                 <span class="text-slate-400 block text-[10px] uppercase font-bold">Termin Pembayaran</span>
                 <span class="text-slate-200 font-medium">{{ $customer->payment_term_days }} hari</span>
             </div>
+            <div>
+                <span class="text-slate-400 block text-[10px] uppercase font-bold">Batas Kasbon</span>
+                <span class="text-slate-200 font-medium">{{ $customer->credit_limit === null ? 'Tanpa batas' : \App\Support\NumberFormatter::currency($customer->credit_limit) }}</span>
+            </div>
             @if ($customer->npwp)
                 <div>
                     <span class="text-slate-400 block text-[10px] uppercase font-bold">NPWP</span>

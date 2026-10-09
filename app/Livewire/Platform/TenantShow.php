@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Platform;
 
+use App\Models\Outlet;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\Tenant;
@@ -41,6 +42,8 @@ class TenantShow extends Component
 
     public string $newPassword = '';
 
+    public string $maxOutletsOverride = '';
+
     public function mount(Tenant $tenant): void
     {
         $this->tenant = $tenant;
@@ -56,6 +59,7 @@ class TenantShow extends Component
     {
         $this->resetForm();
         $this->plan = $this->tenant->plan;
+        $this->maxOutletsOverride = (string) ($this->tenant->max_outlets_override ?? '');
         $this->access_ends_at = $this->tenant->accessEndsAt()?->toDateString() ?? '';
         $this->dispatch('open-modal', 'change-plan');
     }
@@ -87,11 +91,13 @@ class TenantShow extends Component
         $this->authorizeManage();
 
         $this->amount = preg_replace('/\D/', '', $this->amount) ?? '';
+        $this->maxOutletsOverride = preg_replace('/\D/', '', $this->maxOutletsOverride) ?? '';
         $validated = $this->validate([
             'plan' => ['required', Rule::in(SaasPlans::keys())],
             'access_ends_at' => ['nullable', 'date'],
+            'maxOutletsOverride' => ['nullable', 'integer', 'min:1', 'max:1000'],
             ...$this->paymentRules(),
-        ]);
+        ], [], ['maxOutletsOverride' => 'batas outlet khusus']);
 
         $subscriptions->update($this->tenant, [
             'name' => $this->tenant->name,
@@ -99,6 +105,8 @@ class TenantShow extends Component
             'status' => $this->tenant->status,
             'access_ends_at' => $validated['access_ends_at'] ? Carbon::parse($validated['access_ends_at']) : null,
         ], $this->amountValue(), $validated['note']);
+
+        $subscriptions->setOutletOverride($this->tenant->refresh(), filled($validated['maxOutletsOverride']) ? (int) $validated['maxOutletsOverride'] : null);
 
         $this->dispatch('close-modal', 'change-plan');
         $this->notify('Paket toko diperbarui.');
@@ -176,7 +184,7 @@ class TenantShow extends Component
     }
 
     /**
-     * @return array{users: int, products: int, sales: int, revenue: int, sales_30d: int, revenue_30d: int, last_sale_at: ?Carbon}
+     * @return array{users: int, products: int, outlets: int, sales: int, revenue: int, sales_30d: int, revenue_30d: int, last_sale_at: ?Carbon}
      */
     #[Computed]
     public function usage(): array
@@ -188,6 +196,7 @@ class TenantShow extends Component
         return [
             'users' => User::query()->withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->count(),
             'products' => Product::query()->withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->count(),
+            'outlets' => Outlet::query()->withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->where('is_active', true)->count(),
             'sales' => (clone $sales)->count(),
             'revenue' => (int) (clone $sales)->sum('total'),
             'sales_30d' => (clone $recent)->count(),

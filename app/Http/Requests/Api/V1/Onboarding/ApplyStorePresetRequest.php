@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Api\V1\Onboarding;
 
 use App\Enums\StoreType;
+use App\Support\Features;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -32,6 +33,8 @@ class ApplyStorePresetRequest extends FormRequest
             'settings.payment_methods' => ['sometimes', 'array'],
             'settings.payment_methods.*' => ['string'],
             'settings.receipt_footer' => ['sometimes', 'nullable', 'string', 'max:300'],
+            'capabilities' => ['sometimes', 'nullable', 'array'],
+            'capabilities.*' => ['string', Rule::in(Features::optInFeatures())],
         ];
     }
 }

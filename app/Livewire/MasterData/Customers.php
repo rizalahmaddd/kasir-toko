@@ -35,6 +35,8 @@ class Customers extends Component
 
     public string $payment_term_days = '0';
 
+    public string $credit_limit = '';
+
     public bool $is_active = true;
 
     public function save(DocumentNumberGenerator $numbers): void
@@ -42,7 +44,9 @@ class Customers extends Component
         $this->authorizeManage();
 
         $this->code = strtoupper(trim($this->code));
+        $this->credit_limit = preg_replace('/\D/', '', $this->credit_limit) ?? '';
         $validated = $this->validate();
+        $validated['credit_limit'] = $validated['credit_limit'] === '' || $validated['credit_limit'] === null ? null : (int) $validated['credit_limit'];
         $validated['code'] = $validated['code'] ?: $numbers->next('PLG', 4);
         $isEditing = (bool) $this->editingId;
 
@@ -136,6 +140,7 @@ class Customers extends Component
     {
         $this->reset(['code', 'name', 'type', 'contact_person', 'phone', 'email', 'address', 'npwp']);
         $this->payment_term_days = '0';
+        $this->credit_limit = '';
         $this->is_active = true;
     }
 
@@ -150,6 +155,7 @@ class Customers extends Component
         $this->address = (string) $record->address;
         $this->npwp = (string) $record->npwp;
         $this->payment_term_days = (string) $record->payment_term_days;
+        $this->credit_limit = $record->credit_limit === null ? '' : (string) $record->credit_limit;
         $this->is_active = $record->is_active;
     }
 
@@ -165,6 +171,7 @@ class Customers extends Component
             'address' => ['nullable', 'string', 'max:255'],
             'npwp' => ['nullable', 'string', 'max:30'],
             'payment_term_days' => ['required', 'integer', 'min:0'],
+            'credit_limit' => ['nullable', 'integer', 'min:0', 'max:999999999999'],
             'is_active' => ['boolean'],
         ];
     }

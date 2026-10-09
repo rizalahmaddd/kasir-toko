@@ -7,14 +7,15 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * Kategori produk. `products_count` hanya ada di daftar kategori.
+ * Kategori produk. `products_count` hanya ada di daftar kategori. `outlet_ids` kosong berarti dijual di
+ * semua outlet; berisi id berarti hanya tampil di kasir outlet tersebut.
  *
  * @mixin Category
  */
 class CategoryResource extends JsonResource
 {
     /**
-     * @return array{id: int, name: string, sort_order: int, is_active: bool, products_count?: int}
+     * @return array{id: int, name: string, sort_order: int, is_active: bool, products_count?: int, outlet_ids?: list<int>}
      */
     public function toArray(Request $request): array
     {
@@ -24,6 +25,7 @@ class CategoryResource extends JsonResource
             'sort_order' => $this->sort_order,
             'is_active' => $this->is_active,
             'products_count' => $this->whenCounted('products'),
+            'outlet_ids' => $this->whenLoaded('outlets', fn () => $this->outlets->pluck('id')->map(fn ($id) => (int) $id)->values()->all()),
         ];
     }
 }

@@ -90,7 +90,7 @@ class Tenants extends Component
     private function filteredQuery(): Builder
     {
         $query = Tenant::query()
-            ->withCount('users')
+            ->withCount(['users', 'outlets as outlets_count' => fn (Builder $query) => $query->where('is_active', true)])
             ->when($this->search, fn (Builder $query) => $query->where(fn (Builder $sub) => $sub->where('name', 'like', "%{$this->search}%")->orWhere('slug', 'like', "%{$this->search}%")))
             ->when($this->planFilter, fn (Builder $query) => $query->where('plan', $this->planFilter))
             ->when($this->statusFilter, fn (Builder $query) => match ($this->statusFilter) {
@@ -106,6 +106,7 @@ class Tenants extends Component
             'name' => 'name',
             'plan' => 'plan',
             'users_count' => 'users_count',
+            'outlets_count' => 'outlets_count',
             'created_at' => 'created_at',
         ], 'created_at', 'desc');
 

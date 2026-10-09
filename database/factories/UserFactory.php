@@ -33,7 +33,16 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
+            'all_outlets' => true,
         ];
+    }
+
+    /**
+     * Akun cabang: hanya boleh memakai outlet yang ditugaskan lewat outlet_user.
+     */
+    public function limitedToOutlets(): static
+    {
+        return $this->state(['all_outlets' => false]);
     }
 
     /**

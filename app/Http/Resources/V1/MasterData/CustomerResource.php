@@ -12,7 +12,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 class CustomerResource extends JsonResource
 {
     /**
-     * @return array{id: int, code: string, name: string, type: string|null, contact_person: string|null, phone: string|null, email: string|null, address: string|null, npwp: string|null, payment_term_days: int, is_active: bool}
+     * @return array{id: int, code: string, name: string, type: string|null, contact_person: string|null, phone: string|null, email: string|null, address: string|null, npwp: string|null, payment_term_days: int, credit_limit: int|null, is_active: bool}
      */
     public function toArray(Request $request): array
     {
@@ -27,6 +27,7 @@ class CustomerResource extends JsonResource
             'address' => $this->address,
             'npwp' => $this->npwp,
             'payment_term_days' => (int) $this->payment_term_days,
+            'credit_limit' => $this->credit_limit,
             'is_active' => $this->is_active,
         ];
     }

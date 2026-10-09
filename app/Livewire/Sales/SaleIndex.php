@@ -5,6 +5,7 @@ namespace App\Livewire\Sales;
 use App\Enums\PaymentMethod;
 use App\Enums\SaleStatus;
 use App\Livewire\Concerns\WithDataTable;
+use App\Livewire\Concerns\WithOutletFilter;
 use App\Livewire\Concerns\WithRealtimeRefresh;
 use App\Models\Sale;
 use App\Models\User;
@@ -21,7 +22,7 @@ use Livewire\Component;
 #[Title('Riwayat Transaksi')]
 class SaleIndex extends Component
 {
-    use WithDataTable, WithRealtimeRefresh;
+    use WithDataTable, WithOutletFilter, WithRealtimeRefresh;
 
     #[Url]
     public string $search = '';
@@ -88,6 +89,7 @@ class SaleIndex extends Component
         $term = trim($this->search);
 
         return Sale::query()
+            ->forOutlet($this->outletFilterId())
             ->when(! $this->canViewAll(), fn (Builder $query) => $query->where('user_id', auth()->id()))
             ->when($this->canViewAll() && ctype_digit($this->cashier), fn (Builder $query) => $query->where('user_id', (int) $this->cashier))
             ->whereBetween('sold_at', [$this->from.' 00:00:00', $this->to.' 23:59:59'])
@@ -126,9 +128,10 @@ class SaleIndex extends Component
 
     public function export(string $format = 'xlsx')
     {
-        $rows = $this->query()->with(['customer', 'cashier', 'payments'])->orderBy('sold_at')->get()->map(fn (Sale $sale) => [
+        $rows = $this->query()->with(['customer', 'cashier', 'payments', 'outlet'])->orderBy('sold_at')->get()->map(fn (Sale $sale) => [
             $sale->number,
             $sale->sold_at->format('d/m/Y H:i'),
+            $sale->outlet?->name ?? '-',
             $sale->cashier->name,
             $sale->customer?->name ?: 'Umum',
             NumberFormatter::currency($sale->subtotal),
@@ -142,7 +145,7 @@ class SaleIndex extends Component
 
         return $this->exportFormattedResponse(
             'transaksi',
-            ['No. Transaksi', 'Waktu', 'Kasir', 'Pelanggan', 'Subtotal', 'Diskon', 'Pajak', 'Total', 'Pembayaran', 'Sisa Kasbon', 'Status'],
+            ['No. Transaksi', 'Waktu', 'Outlet', 'Kasir', 'Pelanggan', 'Subtotal', 'Diskon', 'Pajak', 'Total', 'Pembayaran', 'Sisa Kasbon', 'Status'],
             $rows,
             'Riwayat Transaksi',
             $this->from === $this->to ? $this->from : "{$this->from} s/d {$this->to}",
@@ -153,9 +156,10 @@ class SaleIndex extends Component
     public function render()
     {
         return view('livewire.sales.sale-index', [
-            'sales' => $this->query()->with(['customer', 'cashier', 'payments'])->withCount('items')->latest('sold_at')->latest('id')->paginate($this->perPage),
+            'sales' => $this->query()->with(['customer', 'cashier', 'payments', 'outlet'])->withCount('items')->latest('sold_at')->latest('id')->paginate($this->perPage),
             'summary' => $this->summary(),
             'cashiers' => $this->cashiers(),
+            'outletChoices' => $this->outletFilterChoices(),
         ]);
     }
 

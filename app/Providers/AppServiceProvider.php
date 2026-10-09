@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Policies\ActivityPolicy;
 use App\Policies\RolePolicy;
 use App\Support\Audit\AuditContext;
+use App\Support\CurrentOutlet;
 use App\Support\CurrentTenant;
 use App\Support\Features;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -39,6 +40,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->scoped(AuditContext::class);
         $this->app->scoped(CurrentTenant::class);
+        $this->app->scoped(CurrentOutlet::class);
 
         // activity()->causedBy($userId) resolves the id through the current guard's provider, but
         // the Sanctum guard has none (API requests crashed with "retrieveById() on null").
@@ -111,8 +113,11 @@ class AppServiceProvider extends ServiceProvider
     private function bootTenancy(): void
     {
         // Job tidak lewat middleware, jadi tenant pengirimnya ikut disimpan di payload.
-        Queue::createPayloadUsing(fn () => ['tenant_id' => app(CurrentTenant::class)->id()]);
-        Event::listen(JobProcessing::class, fn (JobProcessing $event) => app(CurrentTenant::class)->set($event->job->payload()['tenant_id'] ?? null));
+        Queue::createPayloadUsing(fn () => ['tenant_id' => app(CurrentTenant::class)->id(), 'outlet_id' => app(CurrentOutlet::class)->id()]);
+        Event::listen(JobProcessing::class, function (JobProcessing $event) {
+            app(CurrentTenant::class)->set($event->job->payload()['tenant_id'] ?? null);
+            app(CurrentOutlet::class)->set($event->job->payload()['outlet_id'] ?? null);
+        });
 
         // Activity milik package, jadi scope dipasang dari luar. Log login terjadi sebelum tenant
         // aktif, maka tenant diambil dari user yang login.

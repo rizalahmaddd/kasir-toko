@@ -31,6 +31,7 @@ class Customer extends Model
         'address',
         'npwp',
         'payment_term_days',
+        'credit_limit',
         'is_active',
     ];
 
@@ -78,6 +79,7 @@ class Customer extends Model
     {
         return [
             'is_active' => 'boolean',
+            'credit_limit' => 'integer',
         ];
     }
 }

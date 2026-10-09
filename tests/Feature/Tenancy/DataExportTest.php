@@ -44,7 +44,9 @@ it('lets the shop owner download every dataset of their own shop only', function
 
     expect(array_keys($files))->toEqualCanonicalizing([
         'produk.csv', 'kategori.csv', 'pelanggan.csv', 'pengguna.csv', 'transaksi.csv', 'transaksi_item.csv',
-        'pembayaran.csv', 'shift.csv', 'kas_masuk_keluar.csv', 'mutasi_stok.csv', 'pengaturan.csv',
+        'pembayaran.csv', 'shift.csv', 'stok_opname.csv', 'stok_opname_barang.csv', 'kas_masuk_keluar.csv', 'mutasi_stok.csv', 'pengaturan.csv',
+        'outlet.csv', 'stok_outlet.csv', 'harga_outlet.csv', 'transfer_stok.csv',
+        'satuan_produk.csv', 'batch_stok.csv', 'pilihan_tambahan.csv', 'harga_grosir.csv', 'komposisi_produk.csv', 'nomor_seri.csv', 'pesanan.csv', 'surat_jalan.csv', 'resep.csv',
     ])
         ->and(collect($files['produk.csv'])->pluck(3))->toContain('Kopi Susu')->not->toContain('Produk Toko Lain')
         ->and(collect($files['produk.csv'])->firstWhere(3, 'Kopi Susu')[8])->toBe('15000')

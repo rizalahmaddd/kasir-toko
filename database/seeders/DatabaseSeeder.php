@@ -3,8 +3,10 @@
 namespace Database\Seeders;
 
 use App\Enums\StoreType;
+use App\Models\Outlet;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Support\CurrentOutlet;
 use App\Support\CurrentTenant;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -19,7 +21,10 @@ class DatabaseSeeder extends Seeder
     {
         $tenant = Tenant::query()->firstOrCreate(['slug' => 'toko-demo'], ['name' => 'Toko Demo', 'plan' => 'pro', 'store_type' => StoreType::Warung, 'onboarded_at' => now()]);
 
-        app(CurrentTenant::class)->run($tenant, function () {
+        app(CurrentTenant::class)->run($tenant, function () use ($tenant) {
+            Outlet::query()->firstOrCreate(['code' => Outlet::DEFAULT_CODE], ['name' => $tenant->name, 'is_primary' => true]);
+            app(CurrentOutlet::class)->flush();
+
             $this->call(RoleSeeder::class);
             $this->call(SettingsSeeder::class);
 
@@ -89,6 +94,10 @@ class DatabaseSeeder extends Seeder
 
             if (! $user->hasRole($demoUser['role'])) {
                 $user->assignRole($demoUser['role']);
+            }
+
+            if (in_array($demoUser['role'], ['superadmin', 'admin'], true) && ! $user->all_outlets) {
+                $user->forceFill(['all_outlets' => true])->save();
             }
         }
     }

@@ -187,6 +187,14 @@
                     </div>
                 </div>
 
+                <div class="relative z-10 w-full max-w-sm sm:max-w-md mx-auto mt-6">
+                    <a href="{{ route('app.download') }}" class="flex items-center gap-3 min-h-[44px] px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 hover:border-emerald-500/50 text-sm text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 transition focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        <i data-lucide="smartphone" class="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0"></i>
+                        <span class="flex-1">Unduh aplikasi Android</span>
+                        <i data-lucide="download" class="w-4 h-4 shrink-0"></i>
+                    </a>
+                </div>
+
                 <!-- Footer Note on Right Panel -->
                 <div class="relative z-10 w-full max-w-sm sm:max-w-md mx-auto mt-6 text-center text-xs text-slate-500 dark:text-slate-400 flex items-center justify-center gap-1.5 select-none">
                     <span>&copy; {{ date('Y') }} {{ \App\Support\Branding::appName() }}</span>

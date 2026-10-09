@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Customer;
+use App\Models\Prescription;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\User;
@@ -65,8 +66,8 @@ new class extends Component
                 'icon'   => 'package',
                 'color'  => 'emerald',
                 'url'    => fn($r) => route('master-data.products', ['search' => $r->sku]),
-                'sub'    => fn($r) => collect([$r->sku, NumberFormatter::currency($r->price), $r->track_stock ? 'stok '.NumberFormatter::quantity($r->stock).' '.$r->unit : null])->filter()->implode(' · '),
-                'scope'  => fn($qb) => $qb->orderBy('name'),
+                'sub'    => fn($r) => collect([$r->sku, NumberFormatter::currency($r->effectivePrice()), $r->track_stock ? 'stok '.NumberFormatter::quantity($r->outletStock()).' '.$r->unit : null])->filter()->implode(' · '),
+                'scope'  => fn($qb) => $qb->withOutletData()->orderBy('name'),
                 'flags'  => fn($r) => $r->is_active ? ($r->isLowStock() ? [['label' => 'Stok menipis', 'color' => 'amber']] : []) : [['label' => 'Nonaktif', 'color' => 'slate']],
             ];
         }
@@ -82,6 +83,36 @@ new class extends Component
                 'sub'    => fn($r) => collect([$r->code, $r->contact_person, $r->phone])->filter()->implode(' · '),
                 'scope'  => fn($qb) => $qb->orderBy('name'),
                 'flags'  => fn($r) => $r->is_active ? [] : [['label' => 'Nonaktif', 'color' => 'slate']],
+            ];
+        }
+
+        if ($user->can('inventory.opname.count') && Features::enabled('inventory.opname')) {
+            $sections[] = [
+                'model'  => \App\Models\StockCount::class,
+                'fields' => ['number', 'note'],
+                'group'  => 'Stok Opname',
+                'icon'   => 'clipboard-check',
+                'color'  => 'sky',
+                'label'  => fn($r) => $r->number,
+                'url'    => fn($r) => route('inventory.opname.show', $r->id),
+                'sub'    => fn($r) => collect([$r->scope->label(), $r->started_at?->translatedFormat('d M Y'), $r->note])->filter()->implode(' · '),
+                'scope'  => fn($qb) => $qb->latest('id'),
+                'flags'  => fn($r) => [['label' => $r->status->label(), 'color' => $r->status->color()]],
+            ];
+        }
+
+        if ($user->can('pharmacy.prescription.view') && Features::enabled('business.prescription')) {
+            $sections[] = [
+                'model'  => Prescription::class,
+                'fields' => ['number', 'patient_name', 'doctor_name'],
+                'group'  => 'Resep',
+                'icon'   => 'file-heart',
+                'color'  => 'rose',
+                'label'  => fn($r) => $r->number.' · '.$r->patient_name,
+                'url'    => fn($r) => route('pharmacy.prescriptions.show', $r->id),
+                'sub'    => fn($r) => 'dr. '.$r->doctor_name.' · '.$r->prescription_date->translatedFormat('d M Y'),
+                'scope'  => fn($qb) => $qb->latest('prescription_date'),
+                'flags'  => fn($r) => [['label' => $r->status->label(), 'color' => $r->status->color()]],
             ];
         }
 

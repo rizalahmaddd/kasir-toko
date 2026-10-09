@@ -11,8 +11,8 @@
                 {{-- Ringkasan: titik fokus layar ini --}}
                 <div class="p-4 sm:p-6 space-y-4 md:border-r border-slate-800/80 bg-slate-950/40">
                     <div class="rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 border border-slate-700/60 p-4 sm:p-5 shadow-lg shadow-slate-950/40">
-                        <p class="text-xs font-medium text-slate-400">Total tagihan</p>
-                        <p class="text-3xl sm:text-4xl font-extrabold text-slate-50 tabular-nums tracking-tight mt-1" x-text="rupiah(total)"></p>
+                        <p class="text-xs font-medium text-slate-400" x-text="cart.customerOrder ? `Sisa bayar (DP ${rupiah(cart.customerOrder.deposit)} sudah diterima)` : 'Total tagihan'"></p>
+                        <p class="text-3xl sm:text-4xl font-extrabold text-slate-50 tabular-nums tracking-tight mt-1" x-text="rupiah(amountDue)"></p>
                         <p class="text-[11px] text-slate-400 mt-1" x-text="`${quantity(itemCount)} barang${cart.customer ? ' · ' + cart.customer.name : ''}`"></p>
                     </div>
 
@@ -51,7 +51,7 @@
                             <input type="checkbox" class="mt-0.5 rounded border-slate-700 bg-slate-950 text-emerald-600 focus:ring-emerald-500 w-5 h-5" :checked="pay.credit" @change="toggleCredit()">
                             <span>
                                 <span class="block text-xs font-semibold text-amber-300">Catat sisa sebagai kasbon</span>
-                                <span class="block text-[11px] text-slate-400" x-text="cart.customer ? `Atas nama ${cart.customer.name}. Pelunasan dicatat di menu Piutang.` : 'Pilih pelanggan dulu.'"></span>
+                                <span class="block text-[11px] text-slate-400" x-text="cart.customer ? `Atas nama ${cart.customer.name}${cart.customer.credit_limit ? ' · Sisa limit ' + rupiah(Math.max(0, cart.customer.credit_limit - (cart.customer.due || 0))) : ''}. Pelunasan di menu Piutang.` : 'Pilih pelanggan dulu.'"></span>
                             </span>
                         </label>
                         <x-text-button tone="amber" size="sm" x-show="pay.credit" @click="openCustomers()" x-text="cart.customer ? 'Ganti pelanggan' : 'Pilih pelanggan'"></x-text-button>
@@ -155,8 +155,8 @@
                 <div class="flex flex-col-reverse sm:flex-row sm:items-center gap-2.5">
                     <p class="hidden sm:block text-[11px] text-slate-400 mr-auto" x-show="!payProblem">Tekan Enter untuk menyelesaikan.</p>
                     <p class="text-xs font-semibold text-amber-400 sm:mr-auto text-center" x-show="payProblem" x-text="payProblem"></p>
-                    <x-secondary-button x-on:click="$dispatch('close')" x-bind:disabled="pay.submitting">Kembali</x-secondary-button>
-                    <x-primary-button class="!min-h-[3.25rem] sm:min-w-[14rem] !text-sm" x-bind:disabled="pay.submitting || !!payProblem">
+                    <x-secondary-button size="sm" x-on:click="$dispatch('close')" x-bind:disabled="pay.submitting">Kembali</x-secondary-button>
+                    <x-primary-button size="sm" class="sm:min-w-[12rem] font-bold" x-bind:disabled="pay.submitting || !!payProblem">
                         <template x-if="pay.submitting"><x-spinner /></template>
                         <span x-text="pay.submitting ? 'Memproses…' : (payShortfall > 0 ? 'Simpan dengan Kasbon' : (pay.method === 'qris' && payCurrent > 0 ? 'Pembayaran QRIS Diterima' : 'Selesaikan Pembayaran'))"></span>
                     </x-primary-button>
@@ -185,16 +185,16 @@
             </div>
 
             <div class="grid sm:grid-cols-3 gap-2 max-w-xl mx-auto">
-                <x-secondary-button @click="printReceipt()">
+                <x-secondary-button size="sm" @click="printReceipt()">
                     <i data-lucide="printer" class="w-4 h-4"></i>
                     <span>Cetak Struk</span>
                 </x-secondary-button>
                 <a :href="pay.result.whatsapp_url" target="_blank" rel="noopener"
-                    class="inline-flex items-center justify-center gap-2 min-h-[44px] px-4 py-2 text-xs font-semibold rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700">
+                   class="inline-flex flex-row items-center justify-center gap-2 whitespace-nowrap min-h-[44px] sm:min-h-[38px] px-4 py-2 text-xs bg-slate-800 border border-slate-700 text-slate-300 rounded-lg font-semibold hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 transition ease-in-out duration-150 cursor-pointer">
                     <i data-lucide="message-circle" class="w-4 h-4"></i>
                     <span>Kirim via WhatsApp</span>
                 </a>
-                <x-primary-button type="button" @click="newTransaction()" x-init="$nextTick(() => $el.focus())">
+                <x-primary-button size="sm" type="button" @click="newTransaction()" x-init="$nextTick(() => $el.focus())">
                     <i data-lucide="plus" class="w-4 h-4"></i>
                     <span>Transaksi Baru</span>
                 </x-primary-button>

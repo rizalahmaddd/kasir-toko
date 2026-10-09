@@ -5,65 +5,54 @@ namespace App\Http\Controllers\Api\V1\Pos;
 use App\Http\Controllers\Api\V1\Controller;
 use App\Http\Requests\Api\V1\Pos\HoldOrderRequest;
 use App\Http\Resources\V1\Pos\HeldOrderResource;
-use App\Models\Customer;
-use App\Models\HeldOrder;
+use App\Services\Pos\HeldOrderService;
+use App\Services\Pos\PosException;
 use App\Support\OpenApi\Attributes\ApiResponse;
 use App\Support\OpenApi\Attributes\ApiTag;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 use Illuminate\Validation\ValidationException;
 
-#[ApiTag('Transaksi Tertunda', 'Kasir & Penjualan', 'Keranjang yang disimpan sementara (maks. 30 per akun). Hanya milik akun sendiri yang terlihat.')]
+#[ApiTag('Transaksi Tertunda', 'Kasir & Penjualan', 'Keranjang yang disimpan sementara (maks. 30 per akun per outlet). Terlihat: milik akun sendiri di outlet yang sedang dipakai, plus open bill meja.')]
 class HeldOrderController extends Controller
 {
-    private const MAX_PER_USER = 30;
+    public function __construct(private HeldOrderService $heldOrders) {}
 
     /**
      * Daftar transaksi tertunda.
+     *
+     * Milik akun ini di outlet aktif, ditambah open bill meja (`table_label` terisi) dari kasir lain bila
+     * Tipe Pesanan & Meja aktif.
      */
     #[ApiResponse(HeldOrderResource::class, collection: true)]
     public function index(Request $request): AnonymousResourceCollection
     {
-        return HeldOrderResource::collection(
-            HeldOrder::query()->where('user_id', $request->user()->id)->latest()->get(),
-        );
+        return HeldOrderResource::collection($this->heldOrders->query($request->user())->latest()->get());
     }
 
     /**
      * Tunda transaksi.
      *
-     * Label kosong diisi nama pelanggan atau "Pesanan #n".
+     * Label kosong diisi nama pelanggan atau "Pesanan #n". Dengan Tipe Pesanan & Meja, keranjang makan di tempat
+     * yang punya `cart.table` menjadi open bill meja itu: menunda lagi untuk meja yang sama menggabungkan itemnya
+     * (respons 200, `merged` true). Item yang belum pernah dikirim ke dapur dibuatkan tiket dapur (`kitchen_ticket_id`),
+     * dan `cart.kitchenSent` diperbarui.
      */
     #[ApiResponse(HeldOrderResource::class, status: 201)]
-    public function store(HoldOrderRequest $request): HeldOrderResource
+    public function store(HoldOrderRequest $request): JsonResponse
     {
-        $userId = $request->user()->id;
-        $cart = $request->input('cart');
-
-        if (strlen((string) json_encode($cart)) > 200_000) {
-            throw ValidationException::withMessages(['cart' => 'Keranjang terlalu besar untuk ditunda.']);
+        try {
+            $result = $this->heldOrders->hold($request->user(), (array) $request->input('cart'), (string) $request->input('label'));
+        } catch (PosException $exception) {
+            throw ValidationException::withMessages(['message' => $exception->getMessage()]);
         }
 
-        $count = HeldOrder::query()->where('user_id', $userId)->count();
+        $resource = new HeldOrderResource($result['order']);
+        $resource->additional(['meta' => ['merged' => $result['merged'], 'kitchen_ticket_id' => $result['ticket']?->id]]);
 
-        if ($count >= self::MAX_PER_USER) {
-            throw ValidationException::withMessages(['message' => 'Transaksi tertunda sudah 30. Selesaikan atau hapus sebagian dulu.']);
-        }
-
-        $customerId = $cart['customer']['id'] ?? null;
-        $label = trim((string) $request->input('label')) ?: (($cart['customer']['name'] ?? null) ?: 'Pesanan #'.($count + 1));
-
-        $order = HeldOrder::create([
-            'user_id' => $userId,
-            'customer_id' => $customerId && Customer::query()->whereKey($customerId)->exists() ? (int) $customerId : null,
-            'label' => mb_substr($label, 0, 60),
-            'cart' => $cart,
-            'item_count' => count($cart['items']),
-            'total' => max(0, (int) ($cart['total'] ?? 0)),
-        ]);
-
-        return new HeldOrderResource($order);
+        return $resource->response()->setStatusCode($result['merged'] ? 200 : 201);
     }
 
     /**
@@ -74,7 +63,7 @@ class HeldOrderController extends Controller
      */
     public function resume(Request $request, int $heldOrder): HeldOrderResource
     {
-        $order = HeldOrder::query()->where('user_id', $request->user()->id)->findOrFail($heldOrder);
+        $order = $this->heldOrders->query($request->user())->findOrFail($heldOrder);
         $order->delete();
 
         $resource = new HeldOrderResource($order);
@@ -88,7 +77,7 @@ class HeldOrderController extends Controller
      */
     public function destroy(Request $request, int $heldOrder): Response
     {
-        HeldOrder::query()->where('user_id', $request->user()->id)->whereKey($heldOrder)->delete();
+        $this->heldOrders->query($request->user())->whereKey($heldOrder)->delete();
 
         return response()->noContent();
     }

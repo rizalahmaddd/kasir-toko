@@ -4,6 +4,7 @@ namespace App\Livewire\Platform;
 
 use App\Models\Setting;
 use App\Models\Tenant;
+use App\Services\SumoPodPaymentService;
 use App\Support\SaasPlans;
 use App\Support\SaasSettings;
 use Illuminate\Validation\Rule;
@@ -22,6 +23,12 @@ class ServiceSettings extends Component
     public string $supportContact = '';
 
     public string $paymentInstructions = '';
+
+    public string $sumopodApiKey = '';
+
+    public string $sumopodWebhookSecret = '';
+
+    public string $sumopodApiUrl = '';
 
     public ?string $editingPlan = null;
 
@@ -50,6 +57,8 @@ class ServiceSettings extends Component
     public string $planMaxUsers = '';
 
     public string $planMaxProducts = '';
+
+    public string $planMaxOutlets = '1';
 
     public function updatedPlanPrice($value): void
     {
@@ -173,6 +182,11 @@ class ServiceSettings extends Component
         $this->trialDays = (string) SaasSettings::trialDays();
         $this->supportContact = SaasSettings::supportContact() ?? '';
         $this->paymentInstructions = SaasSettings::paymentInstructions() ?? '';
+
+        $sumoPod = app(SumoPodPaymentService::class);
+        $this->sumopodApiKey = Setting::platform('sumopod.api_key') ?? (string) config('services.sumopod.api_key', '');
+        $this->sumopodWebhookSecret = Setting::platform('sumopod.webhook_secret') ?? (string) config('services.sumopod.webhook_secret', '');
+        $this->sumopodApiUrl = Setting::platform('sumopod.api_url') ?? (string) config('services.sumopod.api_url', SumoPodPaymentService::DEFAULT_API_URL);
     }
 
     public function save(): void
@@ -184,14 +198,28 @@ class ServiceSettings extends Component
             'trialDays' => ['required', 'integer', 'min:1', 'max:90'],
             'supportContact' => ['nullable', 'string', 'max:200'],
             'paymentInstructions' => ['nullable', 'string', 'max:1000'],
-        ], [], ['trialDays' => 'lama uji coba', 'supportContact' => 'kontak admin', 'paymentInstructions' => 'cara pembayaran']);
+            'sumopodApiKey' => ['nullable', 'string', 'max:255'],
+            'sumopodWebhookSecret' => ['nullable', 'string', 'max:255'],
+            'sumopodApiUrl' => ['nullable', 'url', 'max:255'],
+        ], [], [
+            'trialDays' => 'lama uji coba',
+            'supportContact' => 'kontak admin',
+            'paymentInstructions' => 'cara pembayaran',
+            'sumopodApiKey' => 'API Key SumoPod',
+            'sumopodWebhookSecret' => 'Webhook Secret SumoPod',
+            'sumopodApiUrl' => 'URL Endpoint SumoPod',
+        ]);
 
         Setting::put(SaasSettings::REGISTRATION_OPEN, $validated['registrationOpen'] ? '1' : '0');
         Setting::put(SaasSettings::TRIAL_DAYS, (string) (int) $validated['trialDays']);
         Setting::put(SaasSettings::SUPPORT_CONTACT, trim((string) $validated['supportContact']) ?: null);
         Setting::put(SaasSettings::PAYMENT_INSTRUCTIONS, trim((string) $validated['paymentInstructions']) ?: null);
 
-        $this->dispatch('notify', message: 'Pengaturan layanan disimpan.');
+        Setting::put('sumopod.api_key', trim((string) ($validated['sumopodApiKey'] ?? '')) ?: null);
+        Setting::put('sumopod.webhook_secret', trim((string) ($validated['sumopodWebhookSecret'] ?? '')) ?: null);
+        Setting::put('sumopod.api_url', trim((string) ($validated['sumopodApiUrl'] ?? '')) ?: null);
+
+        $this->dispatch('notify', message: 'Pengaturan layanan & pembayaran disimpan.');
     }
 
     public function openCreatePlan(): void
@@ -238,6 +266,7 @@ class ServiceSettings extends Component
 
         $this->planMaxUsers = (string) ($plan['max_users'] ?? '');
         $this->planMaxProducts = (string) ($plan['max_products'] ?? '');
+        $this->planMaxOutlets = (string) ($plan['max_outlets'] ?? 1);
         $this->dispatch('open-modal', 'plan-form');
     }
 
@@ -246,7 +275,7 @@ class ServiceSettings extends Component
         $this->authorizeManage();
 
         $this->planKey = strtolower(trim($this->planKey));
-        foreach (['planPrice', 'planMonthlyDiscount', 'planMonthlyFinalPrice', 'planYearlyPrice', 'planYearlyDiscount', 'planYearlyFinalPrice', 'planMaxUsers', 'planMaxProducts'] as $field) {
+        foreach (['planPrice', 'planMonthlyDiscount', 'planMonthlyFinalPrice', 'planYearlyPrice', 'planYearlyDiscount', 'planYearlyFinalPrice', 'planMaxUsers', 'planMaxProducts', 'planMaxOutlets'] as $field) {
             $this->{$field} = preg_replace('/\D/', '', $this->{$field}) ?? '';
         }
 
@@ -320,6 +349,7 @@ class ServiceSettings extends Component
             ],
             'planMaxUsers' => ['nullable', 'integer', 'min:1', 'max:100000'],
             'planMaxProducts' => ['nullable', 'integer', 'min:1', 'max:10000000'],
+            'planMaxOutlets' => ['required', 'integer', 'min:1', 'max:1000'],
         ], [
             'planKey.regex' => 'Kode paket hanya huruf kecil, angka, dan garis bawah, diawali huruf.',
             'planKey.not_in' => 'Kode paket sudah dipakai.',
@@ -336,6 +366,7 @@ class ServiceSettings extends Component
             'planYearlyDiscount' => 'diskon tahunan',
             'planMaxUsers' => 'batas pengguna',
             'planMaxProducts' => 'batas produk',
+            'planMaxOutlets' => 'batas outlet',
         ]);
 
         $key = $this->editingPlan ?? $validated['planKey'];
@@ -352,6 +383,7 @@ class ServiceSettings extends Component
             'yearly_discount' => ($yearlyDiscountVal && $yearlyDiscountVal > 0) ? $yearlyDiscountVal : null,
             'max_users' => filled($validated['planMaxUsers']) ? (int) $validated['planMaxUsers'] : null,
             'max_products' => filled($validated['planMaxProducts']) ? (int) $validated['planMaxProducts'] : null,
+            'max_outlets' => (int) $validated['planMaxOutlets'],
         ];
 
         SaasPlans::save($plans);
@@ -444,7 +476,9 @@ class ServiceSettings extends Component
             'planYearlyDiscountPercent',
             'planMaxUsers',
             'planMaxProducts',
+            'planMaxOutlets',
         ]);
+        $this->planMaxOutlets = '1';
         $this->resetErrorBag();
     }
 }

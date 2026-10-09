@@ -5,16 +5,25 @@ namespace App\Services;
 use App\Enums\PaymentMethod;
 use App\Enums\StoreType;
 use App\Models\Category;
+use App\Models\ModifierGroup;
+use App\Models\Outlet;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\Setting;
 use App\Models\Tenant;
 use App\Support\CurrentTenant;
 use App\Support\Features;
+use App\Support\OutletFeatures;
+use App\Support\OutletSettings;
 use App\Support\StorePresets;
+use App\Support\StorePresets\PresetProduct;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 /**
  * Sets up a tenant from a store-type preset (App\Support\StorePresets) and closes onboarding.
@@ -25,10 +34,16 @@ class StorePresetApplier
     public function __construct(
         private CurrentTenant $currentTenant,
         private DocumentNumberGenerator $numbers,
+        private BusinessCapabilities $capabilities,
+        private VariantService $variants,
     ) {}
 
     /**
-     * @return array{categories_created: int, products_created: int, products_skipped: int}
+     * $capabilities null means the preset's own list; otherwise the business capabilities the owner
+     * kept ticked in the wizard. On a re-apply, capabilities that already hold data stay on.
+     *
+     * @param  list<string>|null  $capabilities
+     * @return array{categories_created: int, products_created: int, products_skipped: int, capabilities: list<string>, capabilities_kept: list<string>}
      *
      * @throws RuntimeException when a preset was already applied and the store has sales.
      */
@@ -38,15 +53,23 @@ class StorePresetApplier
         bool $includeSampleProducts = true,
         ?array $selectedCategories = null,
         ?array $customSettings = null,
+        ?array $capabilities = null,
     ): array {
-        return $this->currentTenant->run($tenant, function () use ($tenant, $type, $includeSampleProducts, $selectedCategories, $customSettings) {
+        return $this->currentTenant->run($tenant, function () use ($tenant, $type, $includeSampleProducts, $selectedCategories, $customSettings, $capabilities) {
             if ($reason = $this->reapplyBlockedReason($tenant)) {
                 throw new RuntimeException($reason);
             }
 
-            return DB::transaction(function () use ($tenant, $type, $includeSampleProducts, $selectedCategories, $customSettings) {
+            $capabilities = array_values(array_intersect($capabilities ?? StorePresets::capabilities($type), Features::optInFeatures()));
+            $kept = $tenant->isOnboarded() ? array_values(array_diff(array_intersect($this->capabilities->withData(), Features::enabledKeys()), $capabilities)) : [];
+
+            return DB::transaction(function () use ($tenant, $type, $includeSampleProducts, $selectedCategories, $customSettings, $capabilities, $kept) {
                 // One summary log entry instead of an audit row and realtime broadcast per product.
-                $result = Model::withoutEvents(fn () => $this->createCatalog($type, $includeSampleProducts, $selectedCategories));
+                $result = Model::withoutEvents(fn () => $this->createCatalog($type, $includeSampleProducts, $selectedCategories, $capabilities, null));
+
+                if (in_array('business.modifiers', $capabilities, true)) {
+                    Model::withoutEvents(fn () => $this->createModifierGroups($type));
+                }
 
                 $settings = StorePresets::settings($type);
                 if ($customSettings !== null && is_array($customSettings)) {
@@ -77,8 +100,16 @@ class StorePresetApplier
                 }
                 Setting::putMany($settings);
 
-                $kept = array_diff(Features::disabledKeys(), StorePresets::MANAGED_FEATURES);
-                Features::setDisabled([...$kept, ...StorePresets::disabledFeatures($type)]);
+                $untouched = array_diff(Features::disabledKeys(), StorePresets::MANAGED_FEATURES);
+                Features::setDisabled([...$untouched, ...StorePresets::disabledFeatures($type)]);
+                $primary = Outlet::query()->where('is_primary', true)->first();
+
+                if ($primary && Outlet::query()->count() > 1) {
+                    $this->capabilities->syncOutlet($primary, [...$capabilities, ...$kept]);
+                } else {
+                    $this->capabilities->sync([...$capabilities, ...$kept]);
+                }
+                $this->seedExtraRoles($type);
 
                 $tenant->forceFill(['store_type' => $type, 'onboarded_at' => $tenant->onboarded_at ?? now()])->save();
 
@@ -89,9 +120,112 @@ class StorePresetApplier
                     $result['products_created'],
                 ));
 
-                return $result;
+                return [...$result, 'capabilities' => $capabilities, 'capabilities_kept' => $kept];
             });
         });
+    }
+
+    /**
+     * Preset untuk satu outlet, mis. outlet Apotek di toko Kelontong. Hanya menambah: kategori baru
+     * dibatasi ke outlet ini, kapabilitas dan setting khas preset hanya berlaku di outlet ini, dan
+     * pajak serta setting toko tidak disentuh. Boleh walau toko sudah punya penjualan.
+     *
+     * @param  list<string>|null  $capabilities  null = kapabilitas bawaan preset
+     * @return array{categories_created: int, products_created: int, products_skipped: int, capabilities: list<string>}
+     */
+    public function applyToOutlet(
+        Outlet $outlet,
+        StoreType $type,
+        bool $includeSampleProducts = true,
+        ?array $selectedCategories = null,
+        ?array $capabilities = null,
+    ): array {
+        $capabilities = array_values(array_intersect($capabilities ?? StorePresets::capabilities($type), Features::optInFeatures()));
+
+        return DB::transaction(function () use ($outlet, $type, $includeSampleProducts, $selectedCategories, $capabilities) {
+            $result = Model::withoutEvents(fn () => $this->createCatalog($type, $includeSampleProducts, $selectedCategories, $capabilities, $outlet));
+
+            if (in_array('business.modifiers', $capabilities, true)) {
+                Model::withoutEvents(fn () => $this->createModifierGroups($type));
+            }
+
+            $this->capabilities->syncOutlet($outlet, $capabilities);
+            $this->seedExtraRoles($type);
+
+            $disabled = StorePresets::disabledFeatures($type);
+            OutletFeatures::setDisabled($outlet, $disabled);
+            OutletSettings::putMany($outlet->id, [
+                ...array_intersect_key(StorePresets::for($type)->settings(), array_flip(OutletSettings::KEYS)),
+                ...(in_array('pos.receivables', $disabled, true) ? ['pos.allow_credit' => '0'] : []),
+            ]);
+            OutletSettings::forget($outlet->id);
+
+            $outlet->forceFill(['store_type' => $type])->save();
+
+            activity('settings')->performedOn($outlet)->causedBy(auth()->user())->log(sprintf(
+                'Preset %s diterapkan ke outlet %s: %d kategori dan %d produk baru.',
+                $type->label(),
+                $outlet->name,
+                $result['categories_created'],
+                $result['products_created'],
+            ));
+
+            return [...$result, 'capabilities' => $capabilities];
+        });
+    }
+
+    /**
+     * Kategori bernama sama yang sudah dibatasi ke outlet lain ikut dibuka untuk outlet ini; kategori
+     * untuk semua outlet dibiarkan.
+     */
+    private function shareWithOutlet(Category $category, Outlet $outlet): void
+    {
+        $outletIds = $category->outlets()->pluck('outlets.id')->map(fn ($id) => (int) $id)->all();
+
+        if ($outletIds !== [] && ! in_array($outlet->id, $outletIds, true)) {
+            $category->restrictToOutlets([...$outletIds, $outlet->id]);
+        }
+    }
+
+    /**
+     * Peran khas jenis toko (mis. apoteker). Peran yang sudah ada tidak diubah supaya kustomisasi pemilik aman.
+     */
+    private function seedExtraRoles(StoreType $type): void
+    {
+        foreach (StorePresets::for($type)->extraRoles() as $name => $permissions) {
+            if (Role::query()->where('tenant_id', $this->currentTenant->id())->where('name', $name)->where('guard_name', 'web')->exists()) {
+                continue;
+            }
+
+            foreach ($permissions as $permission) {
+                Permission::findOrCreate($permission, 'web');
+            }
+
+            Role::findOrCreate($name, 'web')->syncPermissions($permissions);
+        }
+
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+    }
+
+    /**
+     * Grup yang sudah ada (berdasarkan nama) dibiarkan; grup baru dipasang ke produk di kategori contohnya.
+     */
+    private function createModifierGroups(StoreType $type): void
+    {
+        foreach (StorePresets::for($type)->modifierGroups() as $order => $preset) {
+            if (ModifierGroup::query()->where('name', $preset->name)->exists()) {
+                continue;
+            }
+
+            $group = ModifierGroup::query()->create(['name' => $preset->name, 'min_select' => $preset->min, 'max_select' => $preset->max, 'sort_order' => $order + 1, 'is_active' => true]);
+
+            foreach ($preset->options as $index => [$name, $price]) {
+                $group->modifiers()->create(['name' => $name, 'price' => $price, 'sort_order' => $index + 1, 'is_active' => true]);
+            }
+
+            $productIds = Product::query()->whereHas('category', fn ($query) => $query->whereIn('name', $preset->categories))->pluck('id');
+            $group->products()->syncWithPivotValues($productIds, ['sort_order' => $order + 1]);
+        }
     }
 
     /**
@@ -124,9 +258,10 @@ class StorePresetApplier
     }
 
     /**
+     * @param  list<string>  $capabilities
      * @return array{categories_created: int, products_created: int, products_skipped: int}
      */
-    private function createCatalog(StoreType $type, bool $includeSampleProducts, ?array $selectedCategories = null): array
+    private function createCatalog(StoreType $type, bool $includeSampleProducts, ?array $selectedCategories, array $capabilities, ?Outlet $outlet): array
     {
         $result = ['categories_created' => 0, 'products_created' => 0, 'products_skipped' => 0];
         $existingNames = $includeSampleProducts ? Product::query()->pluck('name')->map(fn (string $name) => mb_strtolower($name))->flip() : collect();
@@ -149,14 +284,17 @@ class StorePresetApplier
                     'is_active' => true,
                 ]);
                 $result['categories_created']++;
+                $outlet && $category->restrictToOutlets([$outlet->id]);
+            } elseif ($outlet) {
+                $this->shareWithOutlet($category, $outlet);
             }
 
             if (! $includeSampleProducts) {
                 continue;
             }
 
-            foreach ($products as [$name, $cost, $price, $unit, $minStock]) {
-                if ($existingNames->has(mb_strtolower($name))) {
+            foreach ($products as $preset) {
+                if ($existingNames->has(mb_strtolower($preset->name))) {
                     continue;
                 }
 
@@ -166,18 +304,7 @@ class StorePresetApplier
                     continue;
                 }
 
-                Product::query()->create([
-                    'category_id' => $category->id,
-                    'sku' => $this->numbers->next('PRD', 5),
-                    'name' => $name,
-                    'unit' => $unit,
-                    'cost_price' => $cost,
-                    'price' => $price,
-                    'track_stock' => $minStock !== null,
-                    'stock' => 0,
-                    'min_stock' => $minStock ?? 0,
-                    'is_active' => true,
-                ]);
+                $this->createProduct($category, $preset, $capabilities);
 
                 $result['products_created']++;
                 $remaining = $remaining === null ? null : $remaining - 1;
@@ -192,17 +319,70 @@ class StorePresetApplier
                 }
                 $exists = Category::query()->where('name', $catTrimmed)->exists();
                 if (! $exists) {
-                    Category::query()->create([
+                    $category = Category::query()->create([
                         'name' => $catTrimmed,
                         'sort_order' => (int) Category::query()->max('sort_order') + 1,
                         'is_active' => true,
                     ]);
                     $result['categories_created']++;
+                    $outlet && $category->restrictToOutlets([$outlet->id]);
                 }
             }
         }
 
         return $result;
+    }
+
+    /**
+     * Data khusus usaha (atribut, golongan obat, batch, satuan) hanya diisi untuk kapabilitas yang dinyalakan.
+     *
+     * @param  list<string>  $capabilities
+     */
+    private function createProduct(Category $category, PresetProduct $preset, array $capabilities): void
+    {
+        $attributes = in_array('business.product-attributes', $capabilities, true) && $preset->attributes !== [] ? $preset->attributes : null;
+        $pharmacy = in_array('business.prescription', $capabilities, true);
+
+        $product = Product::query()->create([
+            'category_id' => $category->id,
+            'sku' => $this->numbers->next('PRD', 5),
+            'name' => $preset->name,
+            'unit' => $preset->unit,
+            'cost_price' => $preset->cost,
+            'price' => $preset->price,
+            'track_stock' => $preset->minStock !== null,
+            'stock' => 0,
+            'min_stock' => $preset->minStock ?? 0,
+            'is_active' => true,
+            'custom_attributes' => $attributes,
+            'attributes_search' => $attributes ? Product::searchTextFor($attributes) : null,
+            'drug_class' => $pharmacy ? $preset->drugClass?->value : null,
+            'requires_prescription' => $pharmacy && $preset->requiresPrescription(),
+            'track_batch' => $preset->trackBatch && $preset->minStock !== null && in_array('business.batch-expiry', $capabilities, true),
+            'track_serial' => $preset->trackSerial && $preset->minStock !== null && in_array('business.serial-number', $capabilities, true),
+            'warranty_days' => in_array('business.serial-number', $capabilities, true) ? $preset->warrantyDays : null,
+        ]);
+
+        // Batas paket produk juga menghitung SKU varian; kalau penuh, induknya tetap dibuat tanpa varian.
+        if ($preset->variantOptions !== [] && in_array('business.variants', $capabilities, true)) {
+            try {
+                $this->variants->sync($product, $preset->variantOptions);
+            } catch (ValidationException) {
+                $product->variants()->delete();
+                $product->forceFill(['variant_options' => null, 'track_stock' => $preset->minStock !== null])->save();
+            }
+        }
+
+        if (in_array('business.multi-unit', $capabilities, true)) {
+            foreach ($preset->units as $order => $unit) {
+                $product->units()->create([
+                    'name' => $unit['name'],
+                    'factor' => $unit['factor'],
+                    'price' => $unit['price'],
+                    'sort_order' => $order + 1,
+                ]);
+            }
+        }
     }
 
     /**

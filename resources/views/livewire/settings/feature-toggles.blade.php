@@ -228,6 +228,9 @@
                                         <p class="text-[11px] text-slate-400 mt-0.5 line-clamp-1 leading-snug">
                                             {{ $module['description'] ?? 'Modul fungsional aplikasi.' }}
                                         </p>
+                                        @if ($moduleKey === 'business' && app(\App\Support\CurrentOutlet::class)->isMultiOutlet())
+                                            <p class="text-[11px] text-slate-400 mt-1 leading-snug">Berlaku untuk semua outlet. Untuk satu outlet saja, atur di <x-feature-link :href="route('settings.outlets')" wire:navigate class="text-emerald-400 hover:text-emerald-300">Outlet</x-feature-link>.</p>
+                                        @endif
                                     </div>
                                 </div>
 

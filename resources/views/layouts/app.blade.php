@@ -60,6 +60,7 @@
 
                         {{-- Kanan: Theme Toggle & Notifikasi --}}
                         <div class="flex items-center justify-end gap-1 shrink-0 sm:flex-1 sm:basis-0">
+                            <livewire:layout.outlet-switcher />
                             <x-theme-toggle />
                             <livewire:layout.notification-bell />
                         </div>

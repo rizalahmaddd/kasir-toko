@@ -15,7 +15,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 class SaleResource extends JsonResource
 {
     /**
-     * @return array{id: int, number: string, status: string, status_label: string, sold_at: string, cashier: UserSummaryResource, customer: array{id: int, code: string, name: string, phone: string|null}|null, items_count: int, total: int, paid_amount: int, due_amount: int, payment_methods: list<string>}
+     * @return array{id: int, number: string, status: string, status_label: string, sold_at: string, outlet: array{id: int, name: string, code: string}|null, cashier: UserSummaryResource, customer: array{id: int, code: string, name: string, phone: string|null}|null, items_count: int, total: int, paid_amount: int, due_amount: int, payment_methods: list<string>}
      */
     public function toArray(Request $request): array
     {
@@ -25,6 +25,7 @@ class SaleResource extends JsonResource
             'status' => $this->status->value,
             'status_label' => $this->status->label(),
             'sold_at' => $this->sold_at->toIso8601String(),
+            'outlet' => $this->outlet ? ['id' => $this->outlet->id, 'name' => $this->outlet->name, 'code' => $this->outlet->code] : null,
             'cashier' => new UserSummaryResource($this->cashier),
             'customer' => $this->customer ? [
                 'id' => $this->customer->id,

@@ -28,6 +28,11 @@ Dokumentasi teknis mendalam mengenai arsitektur internal, isolasi multi-tenant, 
 | Template cetak struk thermal | `resources/views/print/receipt.blade.php` | Format cetak struk 58mm/80mm ESC/POS kompatibel |
 | Import massal produk | `app/Services/ProductImportService.php` | Parsing spreadsheet Excel/CSV, auto-kategori, SKU generator, proteksi batas paket |
 | Integrasi SumoPod QRIS | `app/Services/SumoPodPaymentService.php`, `app/Http/Controllers/Api/SumoPodWebhookController.php` | Otomasi tagihan dan webhook pembayaran langganan SaaS |
+| Outlet aktif & akses outlet | `app/Support/CurrentOutlet.php`, `app/Http/Middleware/IdentifyOutlet.php`, trait `BelongsToOutlet` + `OutletAccessScope` | Outlet yang dilayani request (header `X-Outlet-Id` di API, session di web) dan outlet mana yang boleh dipakai user |
+| Siklus hidup outlet | `app/Services/OutletService.php`, `app/Livewire/Settings/Outlets.php`, `app/Http/Controllers/Api/V1/Outlets/` | Buat/ubah/nonaktifkan/hapus outlet, outlet utama, prioritas, akses pengguna, salin pengaturan & harga |
+| Stok per outlet & transfer | `StockService` (`product_stocks`), `app/Services/Pos/StockTransferService.php` | `products.stock` tetap total semua outlet; mutasi dan transfer selalu lewat service |
+| Stok opname | `app/Services/Pos/StockCountService.php`, `StockCountVariance`, `StockCountPoster`, `StockCountGuard`, `StockCountLateSaleReconciler`, `app/Livewire/Inventory/StockCount*.php`, `app/Http/Controllers/Api/V1/Inventory/StockCountController.php` | Opname sebagai dokumen `OPN-...` per outlet. Stok tidak berubah sampai diselesaikan, lalu ditambah/dikurangi sebesar selisih terhadap stok sistem **saat barang dihitung** (bukan di-set ke hasil hitung), supaya toko tetap berjualan. Penjualan offline yang terjadi sebelum dihitung dikenali lewat `stock_movements.occurred_at`; yang masuk setelah selesai dikoreksi otomatis (koreksi susulan) |
+| Pajak, metode bayar, struk, harga per outlet | `app/Support/OutletSettings.php`, `product_outlet_prices` | Penimpaan opsional di atas nilai toko; `PosSettings::get()` membaca penimpaan outlet lebih dulu |
 | Scheduler pengingat masa aktif | `app/Console/Commands/CheckSubscriptionExpirations.php` | Pengingat email H-7, H-3, H-1, H-0 otomatis setiap pagi |
 
 ---
@@ -73,6 +78,25 @@ Kasir Toko menggunakan pendekatan **Single Database, Shared Schema with Tenant C
 
 > [!WARNING]
 > Query yang menggunakan `DB::table(...)` atau raw SQL **tidak melewati Eloquent Global Scope**. Pengembang wajib menambahkan klausa `->where('tenant_id', CurrentTenant::id())` secara eksplisit jika menggunakan query builder mentah.
+
+---
+
+## 2b. Multi-Outlet
+
+Satu toko (tenant) bisa punya beberapa outlet. Billing tetap satu per tenant; batas outlet per paket diatur admin platform di Pengaturan Layanan (`max_outlets`, minimal 1) dan bisa ditimpa per toko lewat `tenants.max_outlets_override`.
+
+| Hal | Aturan |
+|---|---|
+| Dibagi se-tenant | Produk, kategori, pelanggan & piutang, peran, pengguna, pengaturan kasbon/stok minus/diskon |
+| Per outlet | Stok & stok minimum (`product_stocks`), shift, transaksi, pembayaran, transaksi tertunda, mutasi stok, transfer |
+| Boleh beda per outlet | Harga jual (`product_outlet_prices`), pajak, metode bayar, struk, QRIS (`outlet_settings`). Outlet baru bisa menyalin dari outlet lain |
+| Outlet aktif | API: header `X-Outlet-Id` (salah: `403 outlet_forbidden`). Web: session. Tanpa pilihan: outlet shift terbuka, lalu `users.default_outlet_id`, lalu outlet utama |
+| Terkunci paket | Outlet aktif di luar batas paket (urut utama, prioritas, id) hanya bisa dilihat; buka shift, checkout online, penyesuaian stok, dan transfer ditolak (`423 outlet_locked`). Transaksi antrean offline (`offline: true`) tetap diterima |
+| Batas akses | `OutletAccessScope` membatasi pengguna cabang; pemilik/admin (`all_outlets`) tidak difilter global scope, layar daftar menyaring lewat `WithOutletFilter` / `outlet_id` |
+| Nomor dokumen | Toko satu outlet: `TRX-2026-000001`. Toko multi-outlet: `TRX-{KODE}-2026-000001` dengan urutan per outlet |
+
+> [!WARNING]
+> Query `DB::table(...)` tidak ikut `OutletAccessScope`; filter `outlet_id` wajib ditulis manual seperti `tenant_id`. Perubahan stok hanya boleh lewat `StockService` supaya `product_stocks` dan `products.stock` tetap sinkron.
 
 ---
 

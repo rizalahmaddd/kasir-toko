@@ -37,6 +37,7 @@
                     <x-table.th sortable field="plan">Paket</x-table.th>
                     <x-table.th>Aktif Sampai</x-table.th>
                     <x-table.th sortable field="users_count">Pengguna</x-table.th>
+                    <x-table.th sortable field="outlets_count">Outlet</x-table.th>
                     <x-table.th>Status</x-table.th>
                     <x-table.th sortable field="created_at">Terdaftar</x-table.th>
                     <x-table.th align="right">Aksi</x-table.th>
@@ -53,6 +54,7 @@
                         <x-table.td><x-badge :color="$tenant->isOnTrial() ? 'amber' : 'sky'">{{ $tenant->planLabel() }}</x-badge></x-table.td>
                         <x-table.td class="text-slate-300 tabular-nums">{{ $tenant->accessEndsAt()?->translatedFormat('d M Y') ?? 'Tanpa batas' }}</x-table.td>
                         <x-table.td class="text-slate-300 tabular-nums">{{ $tenant->users_count }}</x-table.td>
+                        <x-table.td class="text-slate-300 tabular-nums">{{ $tenant->outlets_count }} / {{ $tenant->maxOutlets() }}</x-table.td>
                         <x-table.td>
                             @if ($reason === null)
                                 <x-badge color="emerald">Aktif</x-badge>

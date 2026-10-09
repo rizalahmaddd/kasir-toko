@@ -296,6 +296,18 @@ test('user managers create accounts that can log in with the chosen role', funct
         ->assertHasErrors('newUserRoles');
 
     expect(User::where('username', 'tanpa')->exists())->toBeFalse();
+
+    Livewire::test(RolesAndPermissions::class)
+        ->set('newUserName', 'Sari Kembar')
+        ->set('newUserUsername', 'sari.kasir')
+        ->set('newUserEmail', 'kembar@example.test')
+        ->set('newUserPhone', '081211112222')
+        ->set('newUserPassword', 'rahasia123')
+        ->set('newUserRoles', ['kasir'])
+        ->call('createUser')
+        ->assertHasErrors(['newUserUsername', 'newUserPhone']);
+
+    expect(User::where('email', 'kembar@example.test')->exists())->toBeFalse();
 });
 
 test('user managers sign a user out of every mobile device', function () {

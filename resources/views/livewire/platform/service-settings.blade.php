@@ -22,14 +22,45 @@
             <div>
                 <x-input-label for="supportContact" value="Kontak WhatsApp / Helpdesk" />
                 <x-text-input wire:model="supportContact" id="supportContact" class="w-full" placeholder="Mis. WhatsApp 0812-3456-7890" />
-                <p class="text-[11px] text-slate-400 mt-1">Ditampilkan kepada pemilik toko jika membutuhkan bantuan layanan.</p>
+                <p class="text-[11px] text-slate-400 mt-1">Ditampilkan kepada pemilik toko jika membutuhkan bantuan layanan atau perpanjangan manual.</p>
                 <x-input-error :messages="$errors->get('supportContact')" class="mt-1.5" />
             </div>
-            <div class="p-3 rounded-lg bg-slate-800/50 border border-slate-700/50 text-[11px] text-slate-300 space-y-1">
-                <div class="font-semibold text-emerald-400 flex items-center gap-1.5">
-                    <i data-lucide="badge-check" class="w-3.5 h-3.5"></i> Pembayaran Otomatis Aktif (SumoPod QRIS)
+
+            <div class="pt-3 border-t border-slate-800/80 space-y-3">
+                <div class="flex items-center justify-between">
+                    <h4 class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                        <i data-lucide="qr-code" class="w-3.5 h-3.5 text-indigo-400"></i> Payment Gateway (SumoPod QRIS)
+                    </h4>
+                    @if (filled($sumopodApiKey))
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Aktif
+                        </span>
+                    @else
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Belum Dikonfigurasi
+                        </span>
+                    @endif
                 </div>
-                <p class="text-slate-400">Pembayaran perpanjangan langganan diproses otomatis secara instan via Payment Gateway SumoPod (QRIS dinamis), sehingga instruksi rekening manual sudah tidak diperlukan lagi.</p>
+
+                <div>
+                    <x-input-label for="sumopodApiKey" value="SumoPod API Key *" />
+                    <x-text-input wire:model="sumopodApiKey" id="sumopodApiKey" type="password" class="w-full font-mono text-xs" placeholder="Kunci API SumoPod (mis. c575b9b...)" autocomplete="off" />
+                    <p class="text-[11px] text-slate-400 mt-1">Wajib diisi agar pelanggan bisa membayar perpanjangan via QRIS otomatis.</p>
+                    <x-input-error :messages="$errors->get('sumopodApiKey')" class="mt-1.5" />
+                </div>
+
+                <div class="grid sm:grid-cols-2 gap-3">
+                    <div>
+                        <x-input-label for="sumopodWebhookSecret" value="Webhook Secret (Opsional)" />
+                        <x-text-input wire:model="sumopodWebhookSecret" id="sumopodWebhookSecret" type="password" class="w-full font-mono text-xs" placeholder="Secret webhook dari dashboard SumoPod" autocomplete="off" />
+                        <x-input-error :messages="$errors->get('sumopodWebhookSecret')" class="mt-1.5" />
+                    </div>
+                    <div>
+                        <x-input-label for="sumopodApiUrl" value="API URL Endpoint" />
+                        <x-text-input wire:model="sumopodApiUrl" id="sumopodApiUrl" class="w-full font-mono text-xs" placeholder="https://api-pay.sumopod.com/api/v1/payments" />
+                        <x-input-error :messages="$errors->get('sumopodApiUrl')" class="mt-1.5" />
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -59,6 +90,7 @@
                     <x-table.th align="right">Harga / Tahun</x-table.th>
                     <x-table.th align="right">Pengguna</x-table.th>
                     <x-table.th align="right">Produk</x-table.th>
+                    <x-table.th align="right">Outlet</x-table.th>
                     <x-table.th align="right">Toko</x-table.th>
                     <x-table.th align="right">Aksi</x-table.th>
                 </tr>
@@ -105,6 +137,7 @@
                         </x-table.td>
                         <x-table.td align="right" class="tabular-nums text-slate-300">{{ $plan['max_users'] ?? 'Tanpa batas' }}</x-table.td>
                         <x-table.td align="right" class="tabular-nums text-slate-300">{{ $plan['max_products'] !== null ? Num::quantity($plan['max_products']) : 'Tanpa batas' }}</x-table.td>
+                        <x-table.td align="right" class="tabular-nums text-slate-300">{{ $plan['max_outlets'] }}</x-table.td>
                         <x-table.td align="right" class="tabular-nums text-slate-300">{{ (int) ($planUsage[$key] ?? 0) }}</x-table.td>
                         <x-table.td align="right">
                             <div class="flex items-center justify-end gap-1">
@@ -222,6 +255,12 @@
                     <x-input-label for="planMaxProducts" value="Batas Produk" />
                     <x-text-input wire:model="planMaxProducts" id="planMaxProducts" inputmode="numeric" class="w-full tabular-nums" placeholder="Tanpa batas" />
                     <x-input-error :messages="$errors->get('planMaxProducts')" class="mt-1.5" />
+                </div>
+                <div>
+                    <x-input-label for="planMaxOutlets" value="Batas Outlet" />
+                    <x-text-input wire:model="planMaxOutlets" id="planMaxOutlets" inputmode="numeric" class="w-full tabular-nums" placeholder="1" />
+                    <p class="text-[11px] text-slate-400 mt-1">Minimal 1. Outlet berlebih saat batas diturunkan dikunci (hanya bisa dilihat), datanya tidak dihapus.</p>
+                    <x-input-error :messages="$errors->get('planMaxOutlets')" class="mt-1.5" />
                 </div>
             </div>
 

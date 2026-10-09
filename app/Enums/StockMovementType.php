@@ -10,6 +10,8 @@ enum StockMovementType: string
     case StockOut = 'stock_out';
     case Opname = 'opname';
     case Initial = 'initial';
+    case TransferOut = 'transfer_out';
+    case TransferIn = 'transfer_in';
 
     public function label(): string
     {
@@ -20,15 +22,17 @@ enum StockMovementType: string
             self::StockOut => 'Stok Keluar',
             self::Opname => 'Stok Opname',
             self::Initial => 'Stok Awal',
+            self::TransferOut => 'Transfer Keluar',
+            self::TransferIn => 'Transfer Masuk',
         };
     }
 
     public function color(): string
     {
         return match ($this) {
-            self::Sale, self::StockOut => 'slate',
+            self::Sale, self::StockOut, self::TransferOut => 'slate',
             self::SaleVoid => 'amber',
-            self::StockIn, self::Initial => 'emerald',
+            self::StockIn, self::Initial, self::TransferIn => 'emerald',
             self::Opname => 'sky',
         };
     }

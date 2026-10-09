@@ -62,6 +62,12 @@
 
     {{-- Filter Dimensi Tambahan (Kasir, Metode Pembayaran, Status) --}}
     <div class="flex flex-wrap items-center gap-2.5 pt-0.5">
+        @if ($outletChoices->count() > 1)
+            <div class="w-full sm:w-44">
+                <x-outlet-filter :choices="$outletChoices" class="w-full" />
+            </div>
+        @endif
+
         <div class="w-full sm:w-44">
             <x-select variant="filter" wire:model.live="cashierId" aria-label="Filter kasir" class="w-full">
                 <option value="">Semua Kasir</option>
@@ -89,7 +95,7 @@
             </x-select>
         </div>
 
-        @if ($cashierId !== '' || $paymentMethod !== '' || $status !== '')
+        @if ($cashierId !== '' || $paymentMethod !== '' || $status !== '' || $outletFilter !== '')
             <button
                 type="button"
                 wire:click="resetFilters"
@@ -476,6 +482,22 @@
                         </div>
                     @endif
                 </x-dashboard.panel>
+
+                @if ($byOutlet->isNotEmpty())
+                    <x-dashboard.panel title="Perbandingan Outlet" icon="store">
+                        <div class="space-y-1">
+                            @foreach ($byOutlet as $row)
+                                <div class="flex items-center justify-between gap-3 text-xs py-1.5 border-b border-slate-800/60 last:border-0">
+                                    <div class="min-w-0">
+                                        <p class="font-medium text-slate-200 truncate">{{ $row['name'] }}</p>
+                                        <p class="text-[10px] text-slate-400">{{ $row['count'] }} nota · laba kotor {{ Num::currency($row['profit']) }}</p>
+                                    </div>
+                                    <span class="tabular-nums text-slate-100 font-bold shrink-0">{{ Num::currency($row['revenue']) }}</span>
+                                </div>
+                            @endforeach
+                        </div>
+                    </x-dashboard.panel>
+                @endif
 
                 {{-- 4. Kasir & Loyalitas Pelanggan --}}
                 <x-dashboard.panel title="Kasir & Loyalitas Pelanggan" icon="users">

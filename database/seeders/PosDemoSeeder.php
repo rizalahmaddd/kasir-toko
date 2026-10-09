@@ -171,7 +171,7 @@ class PosDemoSeeder extends Seeder
     {
         $shifts = app(ShiftService::class);
         $sales = app(SaleService::class);
-        $products = Product::query()->where('is_active', true)->get();
+        $products = Product::query()->with('modifierGroups.modifiers')->where('is_active', true)->get();
         $customers = Customer::query()->where('is_active', true)->limit(5)->get();
         mt_srand(2026);
 
@@ -192,9 +192,12 @@ class PosDemoSeeder extends Seeder
                     'quantity' => $product->unit === 'kg' ? mt_rand(1, 4) / 2 : mt_rand(1, 3),
                     'price' => $product->price,
                     'discount' => 0,
+                    'modifiers' => $product->modifierGroups->where('is_active', true)->filter(fn ($group) => $group->min_select > 0)
+                        ->map(fn ($group) => $group->modifiers->first())->filter()
+                        ->map(fn ($modifier) => ['id' => $modifier->id, 'name' => $modifier->name, 'price' => (int) $modifier->price])->values()->all(),
                 ])->values()->all();
 
-                $total = collect($items)->sum(fn (array $item) => (int) round($item['price'] * $item['quantity']));
+                $total = collect($items)->sum(fn (array $item) => (int) round(($item['price'] + array_sum(array_column($item['modifiers'], 'price'))) * $item['quantity']));
                 $roll = mt_rand(1, 10);
                 $customer = null;
 

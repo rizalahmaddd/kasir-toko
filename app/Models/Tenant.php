@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\StoreType;
+use App\Models\Scopes\TenantScope;
 use App\Support\SaasPlans;
 use Database\Factories\TenantFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -34,7 +35,20 @@ class Tenant extends Model
 
     public const PLAN_LIFETIME = 'lifetime';
 
-    protected $fillable = ['name', 'slug', 'status', 'plan', 'trial_ends_at', 'subscription_ends_at', 'store_type', 'onboarded_at'];
+    /**
+     * Jeda minimal antar perubahan urutan outlet yang beroperasi saat jumlah outlet melebihi batas paket.
+     */
+    public const OUTLET_PRIORITY_COOLDOWN_DAYS = 30;
+
+    protected $fillable = ['name', 'slug', 'status', 'plan', 'trial_ends_at', 'subscription_ends_at', 'store_type', 'onboarded_at', 'max_outlets_override', 'outlet_priority_changed_at'];
+
+    /**
+     * @return HasMany<Outlet, $this>
+     */
+    public function outlets(): HasMany
+    {
+        return $this->hasMany(Outlet::class);
+    }
 
     /**
      * @return HasMany<User, $this>
@@ -235,11 +249,61 @@ class Tenant extends Model
     }
 
     /**
-     * Batas paket untuk "users" atau "products"; null berarti tidak dibatasi.
+     * Batas paket untuk "users", "products", atau "outlets"; null berarti tidak dibatasi. Outlet
+     * selalu punya batas (minimal 1), dengan penimpaan per toko yang diatur admin platform.
      */
     public function limit(string $resource): ?int
     {
+        if ($resource === 'outlets') {
+            return $this->maxOutlets();
+        }
+
         return SaasPlans::find($this->plan)["max_{$resource}"] ?? null;
+    }
+
+    public function maxOutlets(): int
+    {
+        return max(1, (int) ($this->max_outlets_override ?? SaasPlans::find($this->plan)['max_outlets'] ?? 1));
+    }
+
+    /**
+     * Outlet aktif yang boleh bertransaksi: outlet utama dan prioritas teratas sebanyak batas paket.
+     * Sisanya terkunci (hanya bisa dilihat) dan terbuka lagi otomatis saat batas naik.
+     *
+     * @return list<int>
+     */
+    public function operationalOutletIds(): array
+    {
+        return Outlet::query()->withoutGlobalScope(TenantScope::class)
+            ->where('tenant_id', $this->id)
+            ->active()
+            ->byPriority()
+            ->limit($this->maxOutlets())
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    /**
+     * Jenis usaha toko lalu jenis tiap outlet, tanpa duplikat. Atribut produk dan saran satuan
+     * mengikuti gabungan ini karena katalog dipakai bersama semua outlet.
+     *
+     * @return list<StoreType>
+     */
+    public function storeTypes(): array
+    {
+        $outletTypes = Outlet::query()->withoutGlobalScope(TenantScope::class)
+            ->where('tenant_id', $this->id)
+            ->whereNotNull('store_type')
+            ->byPriority()
+            ->pluck('store_type')
+            ->all();
+
+        return collect([$this->store_type, ...$outletTypes])
+            ->filter()
+            ->unique(fn (StoreType $type) => $type->value)
+            ->values()
+            ->all();
     }
 
     protected function casts(): array
@@ -248,6 +312,7 @@ class Tenant extends Model
             'trial_ends_at' => 'datetime',
             'subscription_ends_at' => 'datetime',
             'onboarded_at' => 'datetime',
+            'outlet_priority_changed_at' => 'datetime',
             'store_type' => StoreType::class,
         ];
     }

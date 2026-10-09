@@ -29,6 +29,7 @@ class CustomerRequest extends FormRequest
             'address' => ['nullable', 'string', 'max:255'],
             'npwp' => ['nullable', 'string', 'max:30'],
             'payment_term_days' => ['required', 'integer', 'min:0'],
+            'credit_limit' => ['nullable', 'integer', 'min:0', 'max:999999999999'],
             'is_active' => ['boolean'],
         ];
     }

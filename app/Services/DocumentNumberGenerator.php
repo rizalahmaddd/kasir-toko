@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\DocumentSequence;
+use App\Models\Outlet;
+use App\Support\CurrentOutlet;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -12,12 +14,19 @@ use Illuminate\Support\Facades\DB;
  */
 class DocumentNumberGenerator
 {
-    public function next(string $prefix, int $pad = 4, ?int $year = null): string
+    /**
+     * Dengan $outlet pada toko multi-outlet, nomor berkode outlet dan urutannya sendiri per outlet
+     * (TRX-CB2-2026-000001). Toko satu outlet tetap memakai format lama tanpa kode; kedua urutan
+     * tidak bisa bentrok karena kode outlet selalu ada di nomor berkode.
+     */
+    public function next(string $prefix, int $pad = 4, ?int $year = null, ?Outlet $outlet = null): string
     {
         $year ??= now()->year;
-        $key = "{$prefix}-{$year}";
+        $outlet = $outlet && app(CurrentOutlet::class)->isMultiOutlet() ? $outlet : null;
+        $key = $outlet ? "{$prefix}:{$outlet->id}-{$year}" : "{$prefix}-{$year}";
+        $label = $outlet ? "{$prefix}-{$outlet->code}" : $prefix;
 
-        return DB::transaction(function () use ($prefix, $year, $key, $pad) {
+        return DB::transaction(function () use ($label, $year, $key, $pad) {
             DocumentSequence::query()->firstOrCreate(['key' => $key], ['next_number' => 1]);
 
             $sequence = DocumentSequence::query()->where('key', $key)->lockForUpdate()->firstOrFail();
@@ -25,7 +34,7 @@ class DocumentNumberGenerator
 
             $sequence->update(['next_number' => $number + 1]);
 
-            return sprintf('%s-%d-%s', $prefix, $year, str_pad((string) $number, $pad, '0', STR_PAD_LEFT));
+            return sprintf('%s-%d-%s', $label, $year, str_pad((string) $number, $pad, '0', STR_PAD_LEFT));
         });
     }
 }

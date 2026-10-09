@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Settings;
 
+use App\Services\BusinessCapabilities;
 use App\Support\Features;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
@@ -42,10 +43,18 @@ class FeatureToggles extends Component
         $this->initialState = $this->state;
     }
 
+    /**
+     * Fitur khusus usaha tidak ikut: menyalakannya mengubah alur kasir & stok, jadi dipilih satu per satu.
+     */
     public function enableAll(): void
     {
         foreach (Features::MODULES as $module => $definition) {
             $this->state[$module]['on'] = true;
+
+            if (in_array($module, Features::OPT_IN_MODULES, true)) {
+                continue;
+            }
+
             foreach (array_keys($definition['features']) as $feature) {
                 $this->state[$module]['features'][$feature] = true;
             }
@@ -152,6 +161,7 @@ class FeatureToggles extends Component
         $this->authorizeSuperAdmin();
 
         $disabled = [];
+        $enabled = [];
 
         foreach (Features::MODULES as $module => $definition) {
             if (! ($this->state[$module]['on'] ?? true)) {
@@ -159,18 +169,26 @@ class FeatureToggles extends Component
             }
 
             foreach (array_keys($definition['features']) as $feature) {
-                if (! ($this->state[$module]['features'][$feature] ?? true)) {
-                    $disabled[] = "{$module}.{$feature}";
+                $key = "{$module}.{$feature}";
+                $on = (bool) ($this->state[$module]['features'][$feature] ?? true);
+
+                if (Features::isOptIn($key)) {
+                    $on && $enabled[] = $key;
+                } elseif (! $on) {
+                    $disabled[] = $key;
                 }
             }
         }
 
         $before = Features::disabledKeys();
+        $enabledBefore = Features::enabledKeys();
         Features::setDisabled($disabled);
+        app(BusinessCapabilities::class)->sync($enabled);
         $after = Features::disabledKeys();
+        $enabledAfter = Features::enabledKeys();
 
-        $turnedOff = array_values(array_diff($after, $before));
-        $turnedOn = array_values(array_diff($before, $after));
+        $turnedOff = [...array_diff($after, $before), ...array_diff($enabledBefore, $enabledAfter)];
+        $turnedOn = [...array_diff($before, $after), ...array_diff($enabledAfter, $enabledBefore)];
 
         if ($turnedOff !== [] || $turnedOn !== []) {
             activity('settings')->causedBy(Auth::user())
@@ -290,7 +308,7 @@ class FeatureToggles extends Component
             $this->state[$module] = [
                 'on' => ! in_array($module, $disabled, true),
                 'features' => collect($definition['features'])
-                    ->mapWithKeys(fn (array $feature, string $key) => [$key => ! in_array("{$module}.{$key}", $disabled, true)])
+                    ->mapWithKeys(fn (array $feature, string $key) => [$key => Features::featureSwitchedOn("{$module}.{$key}", $disabled)])
                     ->all(),
             ];
         }

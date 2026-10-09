@@ -20,7 +20,8 @@ class ProductStockAlertNotification extends Notification implements ShouldQueue
         public Product $product,
         public float $currentStock,
         public float $minStock,
-        public bool $isOutOfStock = false
+        public bool $isOutOfStock = false,
+        public ?string $outletName = null,
     ) {}
 
     public function via(object $notifiable): array
@@ -36,13 +37,14 @@ class ProductStockAlertNotification extends Notification implements ShouldQueue
         $stockFormatted = NumberFormatter::quantity($this->currentStock);
         $minFormatted = NumberFormatter::quantity($this->minStock);
         $unit = $this->product->unit ?: 'pcs';
+        $where = $this->outletName ? " di {$this->outletName}" : '';
 
         if ($this->isOutOfStock || $this->currentStock <= 0) {
-            $message = "Stok habis: {$this->product->name} sudah kosong ({$stockFormatted} {$unit})!";
+            $message = "Stok habis: {$this->product->name} sudah kosong{$where} ({$stockFormatted} {$unit})!";
             $color = 'rose';
             $icon = 'package-x';
         } else {
-            $message = "Stok menipis: {$this->product->name} tersisa {$stockFormatted} {$unit} (batas minimum {$minFormatted} {$unit}).";
+            $message = "Stok menipis: {$this->product->name} tersisa {$stockFormatted} {$unit}{$where} (batas minimum {$minFormatted} {$unit}).";
             $color = 'amber';
             $icon = 'alert-triangle';
         }

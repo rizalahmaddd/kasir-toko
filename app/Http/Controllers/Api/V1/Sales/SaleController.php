@@ -11,6 +11,7 @@ use App\Http\Resources\V1\Sales\SaleDetailResource;
 use App\Http\Resources\V1\Sales\SaleResource;
 use App\Models\Sale;
 use App\Services\Pos\SaleService;
+use App\Support\CurrentOutlet;
 use App\Support\DateInput;
 use App\Support\OpenApi\Attributes\ApiQuery;
 use App\Support\OpenApi\Attributes\ApiResponse;
@@ -34,6 +35,7 @@ class SaleController extends Controller
     #[ApiQuery('to', 'date', 'Default hari ini.')]
     #[ApiQuery('status', description: '`credit` = masih ada kasbon.', enum: ['completed', 'voided', 'credit'])]
     #[ApiQuery('method', description: 'Metode pembayaran.', enum: ['cash', 'qris', 'transfer', 'card'])]
+    #[ApiQuery('outlet_id', description: 'Id outlet atau `all`. Default outlet aktif; outlet lain dan `all` butuh izin `reports.all-outlets`.')]
     #[ApiQuery('cashier_id', 'integer', 'Hanya untuk akun dengan izin `sales.view`.')]
     #[ApiQuery('customer_id', 'integer', 'Transaksi satu pelanggan.')]
     #[ApiQuery('search', description: 'No. transaksi, nama/HP pelanggan, atau nama barang.')]
@@ -57,7 +59,7 @@ class SaleController extends Controller
         ];
 
         $sales = $query
-            ->with(['customer', 'cashier', 'payments'])
+            ->with(['customer', 'cashier', 'payments', 'outlet'])
             ->withCount('items')
             ->latest('sold_at')
             ->latest('id')
@@ -106,7 +108,7 @@ class SaleController extends Controller
             'number' => $sale->number,
             'text' => Receipt::text($sale),
             'whatsapp_url' => Receipt::whatsappUrl($sale),
-            'paper_width' => PosSettings::receiptWidth(),
+            'paper_width' => app(CurrentOutlet::class)->run($sale->outlet_id, fn () => PosSettings::receiptWidth()),
         ]);
     }
 
@@ -128,6 +130,7 @@ class SaleController extends Controller
         $status = (string) $request->query('status');
 
         return Sale::query()
+            ->forOutlet($this->outletFilterId($request))
             ->when(! $canViewAll, fn (Builder $query) => $query->where('user_id', $user->id))
             ->when($canViewAll && $request->integer('cashier_id'), fn (Builder $query) => $query->where('user_id', $request->integer('cashier_id')))
             ->when($request->integer('customer_id'), fn (Builder $query) => $query->where('customer_id', $request->integer('customer_id')))

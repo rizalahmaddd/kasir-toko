@@ -1,6 +1,12 @@
 @php use App\Support\NumberFormatter as Num; @endphp
 
 <div class="space-y-4 sm:space-y-6">
+    @if ($outletChoices->count() > 1)
+        <div class="flex justify-end">
+            <x-outlet-filter :choices="$outletChoices" class="w-full sm:w-auto" />
+        </div>
+    @endif
+
     {{-- Satu titik fokus di layar ini (DESIGN.md): penjualan hari ini + jalan pintas ke kasir. --}}
     <div class="relative overflow-hidden rounded-2xl bg-white dark:bg-gradient-to-br dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 border border-slate-200 dark:border-slate-800 p-4 sm:p-6 md:p-8 shadow-sm dark:shadow-xl dark:shadow-slate-950/50">
         <div class="flex flex-col md:flex-row md:items-end justify-between gap-5">
@@ -83,15 +89,31 @@
                                 <x-dashboard.row
                                     :href="route('inventory.stock', ['product' => $product->id])"
                                     :title="$product->name"
-                                    :meta="'Minimum '.Num::quantity($product->min_stock).' '.$product->unit"
-                                    :value="Num::quantity($product->stock).' '.$product->unit"
-                                    :value-tone="(float) $product->stock <= 0 ? 'rose' : 'amber'" />
+                                    :meta="'Minimum '.Num::quantity($product->outletMinStock()).' '.$product->unit"
+                                    :value="Num::quantity($product->outletStock()).' '.$product->unit"
+                                    :value-tone="$product->outletStock() <= 0 ? 'rose' : 'amber'" />
                             @endforeach
                         </ul>
                     @endif
                 </x-dashboard.panel>
             @endif
         </div>
+    @endif
+
+    @if ($openCounts->isNotEmpty())
+        <x-dashboard.panel title="Stok opname berjalan" icon="clipboard-check" :count="$openCounts->count()" :href="route('inventory.opname')">
+            <ul class="divide-y divide-slate-200 dark:divide-slate-800/60">
+                @foreach ($openCounts as $openCount)
+                    <x-dashboard.row
+                        :href="route('inventory.opname.show', $openCount)"
+                        :title="$openCount->number"
+                        :meta="$openCount->status->label().' · sejak '.$openCount->started_at?->translatedFormat('d M H:i')"
+                        :value="($openCount->items_count > 0 ? (int) floor($openCount->counted_items_count * 100 / $openCount->items_count) : 0).'%'"
+                        :badge="$openCount->started_at?->lt(now()->subDays(3)) ? 'LEBIH DARI 3 HARI' : null"
+                        badge-color="amber" />
+                @endforeach
+            </ul>
+        </x-dashboard.panel>
     @endif
 
     @if ($openShifts->count() > 0)

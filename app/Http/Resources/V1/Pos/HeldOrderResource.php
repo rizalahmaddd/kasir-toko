@@ -18,7 +18,7 @@ class HeldOrderResource extends JsonResource
     public bool $withCart = false;
 
     /**
-     * @return array{id: int, label: string, customer_id: int|null, item_count: int, total: int, created_at: string, cart?: array<string, mixed>}
+     * @return array{id: int, label: string, customer_id: int|null, item_count: int, total: int, order_type: string|null, table_label: string|null, is_mine: bool, created_at: string, cart?: array<string, mixed>}
      */
     public function toArray(Request $request): array
     {
@@ -28,6 +28,9 @@ class HeldOrderResource extends JsonResource
             'customer_id' => $this->customer_id,
             'item_count' => $this->item_count,
             'total' => $this->total,
+            'order_type' => $this->order_type,
+            'table_label' => $this->table_label,
+            'is_mine' => $this->user_id === $request->user()?->id,
             'created_at' => $this->created_at->toIso8601String(),
             'cart' => $this->when($this->withCart, fn () => $this->cart),
         ];

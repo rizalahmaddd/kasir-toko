@@ -39,7 +39,7 @@
                         <span class="text-sm font-bold tracking-tight text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition">
                             {{ \App\Support\Branding::appName() }}
                         </span>
-                        <span class="text-[10px] text-slate-500 dark:text-slate-400">Pusat Kebijakan &amp; Legal</span>
+                        <span class="text-[10px] text-slate-500 dark:text-slate-400">{{ $subtitle ?? "Pusat Kebijakan & Legal" }}</span>
                     </div>
                 </a>
 
@@ -48,6 +48,7 @@
                         <a href="{{ route("legal.privacy") }}" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition {{ request()->routeIs("legal.privacy") ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "" }}">Kebijakan Privasi</a>
                         <a href="{{ route("legal.terms") }}" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition {{ request()->routeIs("legal.terms") ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "" }}">Ketentuan Layanan</a>
                         <a href="{{ route("legal.delete-account") }}" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition {{ request()->routeIs("legal.delete-account") ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "" }}">Hapus Akun</a>
+                        <a href="{{ route("app.download") }}" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition {{ request()->routeIs("app.download") ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "" }}">Unduh Aplikasi</a>
                     </nav>
 
                     <button type="button" 
@@ -93,6 +94,8 @@
                     <a href="{{ route("legal.terms") }}" class="hover:underline">Ketentuan Layanan</a>
                     <span>&bull;</span>
                     <a href="{{ route("legal.delete-account") }}" class="hover:underline">Penghapusan Akun</a>
+                    <span>&bull;</span>
+                    <a href="{{ route("app.download") }}" class="hover:underline">Unduh Aplikasi Android</a>
                 </div>
             </div>
         </footer>

@@ -10,6 +10,38 @@
                 <x-icon-button icon="x" label="Tutup" x-on:click="$dispatch('close')" class="-me-2 -mt-1.5" />
             </div>
 
+            <div x-show="editing.serial" x-cloak class="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2.5">
+                <div class="min-w-0 flex-1">
+                    <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Nomor seri / IMEI</p>
+                    <p class="text-sm text-slate-100 font-mono truncate" x-text="editing.serials || 'Belum dipilih'"></p>
+                </div>
+                <x-secondary-button size="sm" @click="editSerials(cart.items.find((l) => l.key === editing.key))">Pilih Nomor Seri</x-secondary-button>
+            </div>
+
+            <div x-show="editing.hasModifierGroups" x-cloak class="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2.5">
+                <div class="min-w-0 flex-1">
+                    <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Pilihan tambahan</p>
+                    <p class="text-sm text-slate-100 truncate" x-text="editing.modifiers || 'Belum ada pilihan'"></p>
+                </div>
+                <x-secondary-button size="sm" @click="editModifiers()">Ubah Pilihan</x-secondary-button>
+            </div>
+
+            <div x-show="editing.units.length" x-cloak>
+                <x-input-label value="Satuan" />
+                <x-segmented class="w-full flex-wrap [&>*]:flex-1">
+                    <x-tab-button x-bind:aria-pressed="editing.unit_id === null" @click="editing.unit_id = null"
+                        x-bind:class="editing.unit_id === null ? '!bg-emerald-500/10 !text-emerald-600 dark:!text-emerald-400 !border-emerald-500/30' : ''">
+                        <span x-text="`${editing.base_unit} · ${rupiah(editing.base_price)}`"></span>
+                    </x-tab-button>
+                    <template x-for="unit in editing.units" :key="unit.id">
+                        <x-tab-button x-bind:aria-pressed="editing.unit_id === unit.id" @click="editing.unit_id = unit.id"
+                            x-bind:class="editing.unit_id === unit.id ? '!bg-emerald-500/10 !text-emerald-600 dark:!text-emerald-400 !border-emerald-500/30' : ''">
+                            <span x-text="`${unit.name} (${quantity(unit.factor)}) · ${rupiah(unit.price)}`"></span>
+                        </x-tab-button>
+                    </template>
+                </x-segmented>
+            </div>
+
             <div>
                 <x-input-label for="pos-line-qty" value="Jumlah" />
                 <div class="flex items-center gap-2">
@@ -43,6 +75,101 @@
                 </x-secondary-button>
                 <x-primary-button>Simpan Perubahan</x-primary-button>
             </div>
+        </form>
+    </template>
+</x-modal>
+
+{{-- Pilih varian produk induk --}}
+<x-modal name="pos-variants" max-width="md">
+    <template x-if="variantPick">
+        <div class="p-5 sm:p-6 space-y-4">
+            <x-modal-header icon="layers" closeable>
+                <x-slot:title><span x-text="variantPick.product.name"></span></x-slot:title>
+                Pilih varian yang dibeli. Stok dihitung per varian.
+            </x-modal-header>
+            <div class="grid grid-cols-2 gap-2 max-h-[55vh] overflow-y-auto custom-scrollbar">
+                <template x-for="child in variantPick.product.variants" :key="child.id">
+                    <button type="button" @click="pickVariant(child)" :disabled="child.track && !config.allowNegative && child.stock <= 0"
+                        class="min-h-[56px] rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-left hover:border-emerald-500/50 disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
+                        <span class="block text-[13px] font-semibold text-slate-100" x-text="child.variant || child.name"></span>
+                        <span class="block text-[11px] text-slate-400 tabular-nums" x-text="`${rupiah(child.price)} · stok ${child.track ? quantity(child.stock) : '∞'}`"></span>
+                    </button>
+                </template>
+            </div>
+        </div>
+    </template>
+</x-modal>
+
+{{-- Pilih nomor seri / IMEI --}}
+<x-modal name="pos-serials" max-width="md">
+    <template x-if="serialPick">
+        <form @submit.prevent="confirmSerials()" class="p-5 sm:p-6 space-y-4">
+            <x-modal-header icon="scan-barcode" closeable>
+                <x-slot:title><span x-text="serialPick.product.name"></span></x-slot:title>
+                Pilih unit yang diserahkan. Jumlah barang mengikuti banyaknya nomor seri.
+            </x-modal-header>
+            <div class="flex gap-2">
+                <x-text-input x-model="serialPick.manual" @keydown.enter.prevent="addManualSerial()" class="flex-1 font-mono" placeholder="Scan / ketik nomor seri" aria-label="Nomor seri" />
+                <x-secondary-button @click="addManualSerial()">Tambah</x-secondary-button>
+            </div>
+            <p x-show="serialPick.loading" class="text-xs text-slate-400">Memuat nomor seri…</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-[40vh] overflow-y-auto custom-scrollbar" x-show="serialPick.options.length || serialPick.selected.length">
+                <template x-for="serial in [...new Set([...serialPick.selected, ...serialPick.options])]" :key="serial">
+                    <label class="flex items-center gap-2.5 min-h-[44px] rounded-lg border px-3 text-sm font-mono cursor-pointer"
+                        :class="serialPick.selected.includes(serial) ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-300' : 'border-slate-800 text-slate-200'">
+                        <input type="checkbox" class="w-4 h-4 rounded border-slate-700 bg-slate-950 text-emerald-500 focus:ring-emerald-500" :checked="serialPick.selected.includes(serial)" @change="toggleSerial(serial)">
+                        <span x-text="serial"></span>
+                    </label>
+                </template>
+            </div>
+            <p x-show="!serialPick.loading && !serialPick.options.length && !serialPick.selected.length" class="text-xs text-amber-400">Tidak ada nomor seri tersedia di outlet ini. Daftarkan lewat halaman Nomor Seri atau Stok Masuk.</p>
+            <p x-show="serialPick.error" x-text="serialPick.error" class="text-xs text-rose-400"></p>
+            <x-modal-actions>
+                <x-secondary-button x-on:click="$dispatch('close')">Batal</x-secondary-button>
+                <x-primary-button><span x-text="`Pakai ${serialPick.selected.length} unit`"></span></x-primary-button>
+            </x-modal-actions>
+        </form>
+    </template>
+</x-modal>
+
+{{-- Pilihan tambahan (modifier) --}}
+<x-modal name="pos-modifiers" max-width="md">
+    <template x-if="modPick">
+        <form @submit.prevent="confirmModifiers()" class="p-5 sm:p-6 space-y-4">
+            <x-modal-header icon="list-plus" closeable>
+                <x-slot:title><span x-text="modPick.product.name"></span></x-slot:title>
+                Pilih varian pesanan. Harga tambahan dihitung per porsi.
+            </x-modal-header>
+
+            <div class="space-y-4 max-h-[55vh] overflow-y-auto custom-scrollbar -mx-1 px-1">
+                <template x-for="group in modPick.groups" :key="group.id">
+                    <fieldset>
+                        <legend class="flex items-baseline justify-between gap-2 w-full mb-1.5">
+                            <span class="text-sm font-semibold text-slate-100" x-text="group.name"></span>
+                            <span class="text-[11px]" :class="group.min > 0 ? 'text-amber-400 font-semibold' : 'text-slate-400'" x-text="group.rule"></span>
+                        </legend>
+                        <div class="grid grid-cols-2 gap-2">
+                            <template x-for="modifier in group.modifiers" :key="modifier.id">
+                                <button type="button" @click="toggleModifier(group, modifier)" :aria-pressed="isModifierPicked(group, modifier)"
+                                    class="min-h-[48px] rounded-lg border px-3 py-2 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                                    :class="isModifierPicked(group, modifier) ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-300' : 'border-slate-800 bg-slate-900 text-slate-200 hover:border-slate-700'">
+                                    <span class="block text-[13px] font-semibold leading-snug" x-text="modifier.name"></span>
+                                    <span class="block text-[11px] tabular-nums" :class="isModifierPicked(group, modifier) ? 'text-emerald-400' : 'text-slate-400'" x-text="modifier.price > 0 ? `+${rupiah(modifier.price)}` : 'Tanpa biaya'"></span>
+                                </button>
+                            </template>
+                        </div>
+                    </fieldset>
+                </template>
+            </div>
+
+            <p x-show="modPick.error" x-text="modPick.error" class="text-xs text-rose-400"></p>
+
+            <x-modal-actions>
+                <x-secondary-button x-on:click="$dispatch('close')">Batal</x-secondary-button>
+                <x-primary-button>
+                    <span x-text="modPick.lineKey ? 'Simpan Pilihan' : `Tambah ${modPickExtra > 0 ? '(+' + rupiah(modPickExtra) + ')' : ''}`"></span>
+                </x-primary-button>
+            </x-modal-actions>
         </form>
     </template>
 </x-modal>
@@ -108,7 +235,10 @@
                                 <span class="block text-sm font-semibold text-slate-100 truncate" x-text="customer.name"></span>
                                 <span class="block text-[11px] text-slate-400 truncate" x-text="[customer.phone, customer.code].filter(Boolean).join(' · ')"></span>
                             </span>
-                            <span x-show="customer.due > 0" class="text-[11px] font-semibold text-amber-400 tabular-nums shrink-0" x-text="`Kasbon ${rupiah(customer.due)}`"></span>
+                            <div class="text-right shrink-0">
+                                <span x-show="customer.due > 0" class="block text-[11px] font-semibold text-amber-400 tabular-nums" x-text="`Kasbon ${rupiah(customer.due)}`"></span>
+                                <span x-show="customer.credit_limit !== null" class="block text-[10px] tabular-nums" :class="(customer.due || 0) >= customer.credit_limit ? 'text-rose-400 font-bold' : 'text-slate-400'" x-text="`Sisa limit ${rupiah(Math.max(0, customer.credit_limit - (customer.due || 0)))}`"></span>
+                            </div>
                         </button>
                     </template>
                     <p x-show="!customerLoading && customerQuery && !customerResults.length" class="px-3 py-4 text-xs text-slate-400">Tidak ada pelanggan yang cocok.</p>
@@ -181,7 +311,10 @@
             <template x-for="order in heldOrders" :key="order.id">
                 <li class="flex items-center gap-2 px-3 py-2">
                     <button type="button" @click="resumeHeld(order)" class="flex-1 min-w-0 text-left min-h-[48px] rounded-lg px-1 hover:bg-slate-800/50">
-                        <span class="block text-sm font-semibold text-slate-100 truncate" x-text="order.label"></span>
+                        <span class="flex items-center gap-1.5 min-w-0">
+                            <span class="text-sm font-semibold text-slate-100 truncate" x-text="order.label"></span>
+                            <span x-show="order.table" class="shrink-0 px-1.5 rounded bg-sky-500/10 text-sky-400 text-[10px] font-bold">OPEN BILL</span>
+                        </span>
                         <span class="block text-[11px] text-slate-400" x-text="`${order.item_count} baris · ${order.created}`"></span>
                     </button>
                     <span class="text-sm font-bold text-slate-100 tabular-nums" x-text="rupiah(order.total)"></span>
@@ -241,12 +374,11 @@
                 </p>
             </div>
             <div class="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
-                <a href="{{ route('settings.subscription') }}" wire:navigate
-                    class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-sm shadow-md shadow-amber-500/20 transition">
+                <x-primary-button size="sm" :href="route('settings.subscription')" wire:navigate class="!bg-gradient-to-r !from-amber-500 !to-amber-600 hover:!from-amber-400 hover:!to-amber-500 !text-slate-950 font-bold">
                     <i data-lucide="sparkles" class="w-4 h-4"></i>
-                    Upgrade ke Pro Sekarang
-                </a>
-                <x-secondary-button @click="$dispatch('close-modal', 'pos-display')">
+                    <span>Upgrade ke Pro Sekarang</span>
+                </x-primary-button>
+                <x-secondary-button size="sm" @click="$dispatch('close-modal', 'pos-display')">
                     Tutup
                 </x-secondary-button>
             </div>
@@ -290,4 +422,90 @@
             </template>
         </div>
     @endif
+</x-modal>
+
+{{-- Tautkan resep obat --}}
+<x-modal name="pos-prescription" max-width="lg">
+    <div class="p-5 sm:p-6 space-y-4">
+        <x-modal-header title="Resep obat" icon="file-heart" closeable>
+            <span x-text="config.prescription?.mode === 'strict' ? 'Obat wajib resep hanya bisa diserahkan dengan resep yang sudah diverifikasi apoteker.' : 'Catat dokter dan pasien untuk obat wajib resep.'"></span>
+        </x-modal-header>
+
+        <x-segmented class="w-full [&>*]:flex-1" x-show="config.prescription?.canView && canDraftPrescription">
+            <x-tab-button x-bind:aria-pressed="rx.tab === 'saved'" @click="rx.tab = 'saved'; searchPrescriptions()" x-bind:class="rx.tab === 'saved' ? '!bg-emerald-500/10 !text-emerald-600 dark:!text-emerald-400 !border-emerald-500/30' : ''">Resep tersimpan</x-tab-button>
+            <x-tab-button x-bind:aria-pressed="rx.tab === 'draft'" @click="rx.tab = 'draft'" x-bind:class="rx.tab === 'draft' ? '!bg-emerald-500/10 !text-emerald-600 dark:!text-emerald-400 !border-emerald-500/30' : ''">Isi langsung</x-tab-button>
+        </x-segmented>
+
+        <template x-if="rx.tab === 'saved'">
+            <div class="space-y-3">
+                <div class="relative">
+                    <i data-lucide="search" aria-hidden="true" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                    <input type="search" x-model="rx.query" @input.debounce.300ms="searchPrescriptions()" placeholder="Cari nomor resep, pasien, atau dokter" aria-label="Cari resep"
+                        class="w-full h-11 bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-3 text-sm text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500">
+                </div>
+                <div class="rounded-xl border border-slate-800 divide-y divide-slate-800/60 max-h-[45vh] overflow-y-auto custom-scrollbar">
+                    <template x-for="item in rx.results" :key="item.id">
+                        <button type="button" @click="selectPrescription(item)" class="w-full px-3 py-2.5 min-h-[52px] text-left hover:bg-slate-800/60"
+                            :class="cart.prescription?.id === item.id && 'bg-emerald-500/5'">
+                            <span class="flex items-center gap-2">
+                                <span class="font-mono text-xs font-semibold text-slate-100" x-text="item.number"></span>
+                                <span class="text-[11px] text-slate-400" x-text="item.date"></span>
+                                <span class="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded" :class="item.verified ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'" x-text="item.verified ? 'TERVERIFIKASI' : 'MENUNGGU APOTEKER'"></span>
+                            </span>
+                            <span class="block text-sm text-slate-200 mt-0.5" x-text="`${item.patient} · dr. ${item.doctor}`"></span>
+                            <div class="flex flex-wrap gap-1 mt-1.5">
+                                <template x-for="(drug, dIdx) in (item.items || []).slice(0, 4)" :key="dIdx">
+                                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300 font-medium">
+                                        <span x-text="drug.name"></span>
+                                        <span class="text-emerald-400 font-bold" x-text="`sisa ${quantity(drug.remaining)}`"></span>
+                                    </span>
+                                </template>
+                                <span x-show="(item.items || []).length > 4" class="text-[10px] text-slate-500 self-center" x-text="`+${item.items.length - 4} lainnya`"></span>
+                            </div>
+                        </button>
+                    </template>
+                    <p x-show="!rx.loading && !rx.results.length" class="px-3 py-4 text-xs text-slate-400">Belum ada resep yang bisa ditebus.</p>
+                    <p x-show="rx.loading" class="px-3 py-4 text-xs text-slate-400">Mencari…</p>
+                </div>
+                <a x-show="config.prescription?.createUrl" :href="config.prescription?.createUrl" target="_blank" rel="noopener"
+                    class="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-400 hover:underline py-1.5">
+                    <i data-lucide="file-plus-2" class="w-4 h-4"></i> Catat resep baru di tab lain
+                </a>
+            </div>
+        </template>
+
+        <template x-if="rx.tab === 'draft'">
+            <form @submit.prevent="saveDraftPrescription()" class="space-y-3">
+                <p x-show="!canDraftPrescription" class="text-xs text-amber-300">Mode resep ketat: minta apoteker mencatat dan memverifikasi resep dulu.</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <x-input-label for="rx-doctor" value="Nama dokter *" />
+                        <x-text-input id="rx-doctor" x-model="rx.draft.doctor_name" maxlength="100" class="w-full" />
+                    </div>
+                    <div>
+                        <x-input-label for="rx-sip" value="No. SIP dokter" />
+                        <x-text-input id="rx-sip" x-model="rx.draft.doctor_sip" maxlength="50" class="w-full" />
+                    </div>
+                    <div>
+                        <x-input-label for="rx-patient" value="Nama pasien *" />
+                        <x-text-input id="rx-patient" x-model="rx.draft.patient_name" maxlength="100" class="w-full" />
+                    </div>
+                    <div>
+                        <x-input-label for="rx-age" value="Umur pasien" />
+                        <x-text-input id="rx-age" x-model="rx.draft.patient_age" inputmode="numeric" class="w-full" />
+                    </div>
+                </div>
+                <div>
+                    <x-input-label for="rx-clinic" value="Klinik / rumah sakit" />
+                    <x-text-input id="rx-clinic" x-model="rx.draft.clinic_name" maxlength="150" class="w-full" />
+                </div>
+                <x-modal-actions>
+                    <x-secondary-button x-on:click="$dispatch('close')">Batal</x-secondary-button>
+                    <x-primary-button x-bind:disabled="!canDraftPrescription">Pakai Resep Ini</x-primary-button>
+                </x-modal-actions>
+            </form>
+        </template>
+
+        <p x-show="rx.error" x-text="rx.error" class="text-xs text-rose-400"></p>
+    </div>
 </x-modal>

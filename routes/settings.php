@@ -5,6 +5,7 @@ use App\Livewire\Settings\CompanyProfile;
 use App\Livewire\Settings\CustomerDisplaySettingsPage;
 use App\Livewire\Settings\DataExport;
 use App\Livewire\Settings\FeatureToggles;
+use App\Livewire\Settings\Outlets;
 use App\Livewire\Settings\PosSettingsPage;
 use App\Livewire\Settings\RolesAndPermissions;
 use App\Livewire\Settings\SubscriptionPage;
@@ -14,6 +15,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['auth', 'verified'])->prefix('pengaturan')->name('settings.')->group(function () {
     Route::get('perusahaan', CompanyProfile::class)->name('company-profile');
     Route::get('kasir', PosSettingsPage::class)->name('pos');
+    Route::get('outlet', Outlets::class)->middleware('can:outlets.view')->name('outlets');
     Route::get('layar-pelanggan', CustomerDisplaySettingsPage::class)->middleware('pro')->name('customer-display');
     Route::get('peran-izin', RolesAndPermissions::class)->name('roles-and-permissions');
     Route::get('fitur', FeatureToggles::class)->name('features');

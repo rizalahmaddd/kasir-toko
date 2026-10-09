@@ -3,19 +3,24 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\CashMovementType;
+use App\Enums\DrugClass;
 use App\Enums\PaymentMethod;
+use App\Enums\PrescriptionStatus;
 use App\Enums\SaleStatus;
 use App\Enums\StockMovementType;
 use App\Http\Resources\V1\MetaResource;
 use App\Http\Resources\V1\NotificationResource;
 use App\Http\Resources\V1\SearchResultResource;
 use App\Livewire\MasterData\Products;
-use App\Models\Setting;
 use App\Support\Branding;
+use App\Support\CurrentOutlet;
 use App\Support\OpenApi\Attributes\ApiQuery;
 use App\Support\OpenApi\Attributes\ApiResponse;
 use App\Support\OpenApi\Attributes\ApiTag;
+use App\Support\OutletIdentity;
 use App\Support\PosSettings;
+use App\Support\ProductAttributes;
+use App\Support\StorePresets\AttributeField;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
@@ -27,10 +32,15 @@ class MetaController extends Controller
      *
      * Nama/logo aplikasi, identitas toko untuk struk, dan label semua pilihan tetap untuk mengisi
      * form. Cukup diambil sekali saat aplikasi dibuka. `receipt` berisi semua yang dicetak di kepala
-     * dan kaki struk thermal, supaya aplikasi bisa mencetak sendiri lewat Bluetooth.
+     * dan kaki struk thermal, supaya aplikasi bisa mencetak sendiri lewat Bluetooth; nilainya sudah
+     * diresolusi untuk outlet yang sedang dipakai (alamat, telepon, header, footer, pajak, kertas),
+     * dan `outlet_name` terisi hanya di toko multi-outlet. `product_attributes` adalah skema isian
+     * produk tambahan sesuai jenis toko (kosong selama kapabilitas Atribut Produk Khusus mati).
      */
     public function meta(): MetaResource
     {
+        $identity = OutletIdentity::for(app(CurrentOutlet::class)->get());
+
         return new MetaResource([
             'app' => [
                 'name' => Branding::appName(),
@@ -40,8 +50,9 @@ class MetaController extends Controller
             ],
             'receipt' => [
                 'store_name' => Branding::companyName(),
-                'address' => (string) Setting::get('company_address', ''),
-                'phone' => (string) Setting::get('company_phone', ''),
+                'outlet_name' => $identity['name'],
+                'address' => (string) $identity['address'],
+                'phone' => (string) $identity['phone'],
                 'header' => PosSettings::get('pos.receipt_header'),
                 'footer' => PosSettings::get('pos.receipt_footer'),
                 'tax_label' => PosSettings::taxLabel(),
@@ -55,9 +66,21 @@ class MetaController extends Controller
                 'stock_movement_types' => collect(StockMovementType::cases())->mapWithKeys(fn (StockMovementType $type) => [$type->value => $type->label()])->all(),
                 'stock_adjustment_types' => ['stock_in' => StockMovementType::StockIn->label(), 'stock_out' => StockMovementType::StockOut->label(), 'opname' => StockMovementType::Opname->label()],
                 'cash_movement_types' => collect(CashMovementType::cases())->mapWithKeys(fn (CashMovementType $type) => [$type->value => $type->label()])->all(),
-                'product_units' => array_combine(Products::UNITS, Products::UNITS),
+                'product_units' => array_combine($units = array_values(array_unique([...$this->suggestedUnits(), ...Products::UNITS])), $units),
+                'drug_classes' => collect(DrugClass::cases())->mapWithKeys(fn (DrugClass $class) => [$class->value => $class->label()])->all(),
+                'prescription_statuses' => collect(PrescriptionStatus::cases())->mapWithKeys(fn (PrescriptionStatus $status) => [$status->value => $status->label()])->all(),
+                'prescription_modes' => PosSettings::PRESCRIPTION_MODES,
             ],
+            'product_attributes' => array_map(fn (AttributeField $field) => $field->toArray(), ProductAttributes::fields()),
         ]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function suggestedUnits(): array
+    {
+        return ProductAttributes::suggestedUnits();
     }
 
     /**

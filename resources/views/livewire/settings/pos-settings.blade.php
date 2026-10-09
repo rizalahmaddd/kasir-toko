@@ -1,5 +1,5 @@
 <div class="space-y-4 sm:space-y-6">
-    <p class="text-xs text-slate-400">Aturan yang dipakai layar kasir, checkout, dan struk. Berlaku untuk semua kasir.</p>
+    <p class="text-xs text-slate-400">Aturan yang dipakai layar kasir, checkout, dan struk. Berlaku untuk semua kasir.@if (app(\App\Support\CurrentOutlet::class)->isMultiOutlet()) Pajak, metode pembayaran, struk, dan QRIS di sini adalah nilai bawaan toko; tiap outlet bisa menimpanya di <x-feature-link :href="route('settings.outlets')" wire:navigate class="text-emerald-400 hover:underline">halaman Outlet</x-feature-link>.@endif</p>
 
     <form wire:submit="save" class="grid lg:grid-cols-[minmax(0,1fr)_20rem] gap-4 sm:gap-6 items-start">
         <div class="space-y-4 sm:space-y-5">
@@ -87,9 +87,92 @@
             </section>
 
             <section class="bg-slate-900/80 border border-slate-800/80 rounded-xl p-4 sm:p-5 space-y-3.5">
+                <h3 class="text-sm font-bold text-slate-100 flex items-center gap-2"><i data-lucide="hand-platter" class="w-4 h-4 text-slate-400"></i> Service charge</h3>
+                <div class="grid grid-cols-2 gap-3.5 items-start">
+                    <div>
+                        <x-input-label for="serviceChargeRate" value="Tarif (%)" />
+                        <x-text-input wire:model="serviceChargeRate" id="serviceChargeRate" inputmode="decimal" class="w-full font-mono" placeholder="0 = tidak dipungut" />
+                        <x-input-error :messages="$errors->get('serviceChargeRate')" class="mt-1.5" />
+                    </div>
+                    <p class="text-[11px] text-slate-400 pt-6">Dihitung dari subtotal sesudah diskon, lalu ikut dikenai pajak.</p>
+                </div>
+                @if (\App\Support\Features::enabled('business.order-type'))
+                    <x-checkbox-card wire:model="serviceChargeDineInOnly" label="Hanya untuk makan di tempat" description="Pesanan bawa pulang dan antar tidak dikenai service charge." />
+                @endif
+            </section>
+
+            <section class="bg-slate-900/80 border border-slate-800/80 rounded-xl p-4 sm:p-5 space-y-3.5">
                 <h3 class="text-sm font-bold text-slate-100 flex items-center gap-2"><i data-lucide="warehouse" class="w-4 h-4 text-slate-400"></i> Stok</h3>
                 <x-checkbox-card wire:model="allowNegativeStock" label="Tetap boleh menjual saat stok di sistem habis" description="Berguna kalau barang fisik ada tapi stok belum dicatat. Stok bisa menjadi minus dan ditandai merah di halaman Stok." />
+                @if (\App\Support\Features::enabled('inventory.opname'))
+                    <div class="grid sm:grid-cols-3 gap-3.5 pt-1">
+                        <div>
+                            <x-input-label for="opnameReasonAbove" value="Opname: alasan wajib bila selisih di atas (Rp)" />
+                            <x-text-input wire:model="opnameReasonAbove" id="opnameReasonAbove" inputmode="numeric" class="w-full font-mono" placeholder="0 = tidak wajib" />
+                            <x-input-error :messages="$errors->get('opnameReasonAbove')" class="mt-1.5" />
+                        </div>
+                        <div>
+                            <x-input-label for="opnameRecountPercent" value="Sarankan hitung ulang bila selisih di atas (%)" />
+                            <x-text-input wire:model="opnameRecountPercent" id="opnameRecountPercent" inputmode="decimal" class="w-full font-mono" />
+                            <x-input-error :messages="$errors->get('opnameRecountPercent')" class="mt-1.5" />
+                        </div>
+                        <div>
+                            <x-input-label for="opnameAlertAbove" value="Kabari pemilik bila nilai kurang di atas (Rp)" />
+                            <x-text-input wire:model="opnameAlertAbove" id="opnameAlertAbove" inputmode="numeric" class="w-full font-mono" placeholder="0 = mati" />
+                            <x-input-error :messages="$errors->get('opnameAlertAbove')" class="mt-1.5" />
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-slate-400 -mt-1.5">Persen dihitung dari stok sistem barang itu. Kabar ke pemilik dikirim saat opname diselesaikan, termasuk ke yang menyelesaikannya.</p>
+                @endif
             </section>
+
+            @if (\App\Support\Features::enabled('business.batch-expiry'))
+                <section class="bg-slate-900/80 border border-slate-800/80 rounded-xl p-4 sm:p-5 space-y-3.5">
+                    <h3 class="text-sm font-bold text-slate-100 flex items-center gap-2"><i data-lucide="calendar-x-2" class="w-4 h-4 text-slate-400"></i> Kedaluwarsa</h3>
+                    <x-checkbox-card wire:model="blockExpiredSale" label="Tolak penjualan batch yang sudah kedaluwarsa" description="Kasir tidak bisa menjual stok yang tanggal kedaluwarsanya sudah lewat. Transaksi offline tetap diterima dan ditandai." />
+                    <div class="max-w-xs">
+                        <x-input-label for="expiryWarningDays" value="Peringatan kedaluwarsa (hari sebelumnya)" />
+                        <x-text-input wire:model="expiryWarningDays" id="expiryWarningDays" inputmode="numeric" class="w-full" />
+                        <x-input-error :messages="$errors->get('expiryWarningDays')" class="mt-1.5" />
+                    </div>
+                    <div class="grid grid-cols-2 gap-3.5">
+                        <div>
+                            <x-input-label for="nearExpiryPercent" value="Diskon otomatis ED dekat (%)" />
+                            <x-text-input wire:model="nearExpiryPercent" id="nearExpiryPercent" inputmode="decimal" class="w-full font-mono" placeholder="0 = mati" />
+                            <x-input-error :messages="$errors->get('nearExpiryPercent')" class="mt-1.5" />
+                        </div>
+                        <div>
+                            <x-input-label for="nearExpiryDays" value="Berlaku bila ED ≤ (hari)" />
+                            <x-text-input wire:model="nearExpiryDays" id="nearExpiryDays" inputmode="numeric" class="w-full font-mono" />
+                            <x-input-error :messages="$errors->get('nearExpiryDays')" class="mt-1.5" />
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-slate-400 -mt-1.5">Unit yang diambil dari batch yang kedaluwarsa dalam rentang ini otomatis dipotong di kasir, mis. roti H-1. Hanya untuk penjualan dalam satuan dasar.</p>
+                </section>
+            @endif
+
+            @if (\App\Support\Features::enabled('business.prescription'))
+                <section class="bg-slate-900/80 border border-slate-800/80 rounded-xl p-4 sm:p-5 space-y-3.5">
+                    <h3 class="text-sm font-bold text-slate-100 flex items-center gap-2"><i data-lucide="file-heart" class="w-4 h-4 text-slate-400"></i> Resep obat</h3>
+                    <div>
+                        <x-input-label for="prescriptionMode" value="Aturan obat wajib resep" />
+                        <x-select id="prescriptionMode" wire:model="prescriptionMode">
+                            @foreach (\App\Support\PosSettings::PRESCRIPTION_MODES as $mode => $label)
+                                <option value="{{ $mode }}">{{ $label }}</option>
+                            @endforeach
+                        </x-select>
+                    </div>
+                    <div class="grid grid-cols-[8rem_1fr] gap-3.5 items-start">
+                        <div>
+                            <x-input-label for="photoRetentionYears" value="Simpan foto resep" />
+                            <x-text-input wire:model="photoRetentionYears" id="photoRetentionYears" inputmode="numeric" class="w-full font-mono" />
+                            <x-input-error :messages="$errors->get('photoRetentionYears')" class="mt-1.5" />
+                        </div>
+                        <p class="text-[11px] text-slate-400 pt-6">Tahun. Foto resep yang lebih lama dihapus otomatis tiap malam; data resepnya tetap. Isi 0 untuk menyimpan selamanya. Resep apotek umumnya disimpan minimal 5 tahun.</p>
+                    </div>
+                    <x-checkbox-card wire:model="allowControlledDrugs" label="Izinkan narkotika & psikotropika dijual lewat kasir" description="Aplikasi tidak membuat laporan SIPNAP dan tidak menjamin kepatuhan regulasi farmasi. Nyalakan hanya jika apotek Anda mencatat dan melaporkannya sendiri." />
+                </section>
+            @endif
 
             <section class="bg-slate-900/80 border border-slate-800/80 rounded-xl p-4 sm:p-5 space-y-3.5">
                 <h3 class="text-sm font-bold text-slate-100 flex items-center gap-2"><i data-lucide="printer" class="w-4 h-4 text-slate-400"></i> Struk</h3>

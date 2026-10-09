@@ -6,30 +6,47 @@ use App\Enums\CashMovementType;
 use App\Events\CashShiftClosed;
 use App\Models\CashMovement;
 use App\Models\CashShift;
+use App\Models\Outlet;
 use App\Models\User;
 use App\Services\DocumentNumberGenerator;
+use App\Support\CurrentOutlet;
 use Illuminate\Support\Facades\DB;
 
 class ShiftService
 {
     public function __construct(private DocumentNumberGenerator $numbers) {}
 
-    public function open(User $user, int $openingCash): CashShift
+    /**
+     * Shift dibuka di outlet aktif. Satu user hanya boleh punya satu shift terbuka di seluruh outlet.
+     */
+    public function open(User $user, int $openingCash, ?int $outletId = null): CashShift
     {
         if ($openingCash < 0) {
             throw new PosException('Modal awal tidak boleh negatif.');
         }
 
-        return DB::transaction(function () use ($user, $openingCash) {
+        $outletId ??= app(CurrentOutlet::class)->idOrPrimary() ?? throw new PosException('Toko belum punya outlet.');
+        app(CurrentOutlet::class)->ensureOperational($outletId);
+
+        return DB::transaction(function () use ($user, $openingCash, $outletId) {
             // Kunci baris user supaya dua tab/perangkat yang membuka shift bersamaan tidak menghasilkan dua shift.
             User::query()->whereKey($user->id)->lockForUpdate()->first();
 
             if ($existing = $user->openShift()) {
+                if ($existing->outlet_id !== $outletId) {
+                    $name = Outlet::query()->whereKey($existing->outlet_id)->value('name');
+
+                    throw new PosException("Shift Anda masih terbuka di outlet {$name}. Tutup dulu shift itu sebelum membuka shift di outlet ini.", 'shift_other_outlet');
+                }
+
                 return $existing;
             }
 
+            $outlet = Outlet::query()->findOrFail($outletId);
+
             return CashShift::create([
-                'number' => $this->numbers->next('SFT', 5),
+                'outlet_id' => $outletId,
+                'number' => $this->numbers->next('SFT', 5, null, $outlet),
                 'user_id' => $user->id,
                 'opened_at' => now(),
                 'opening_cash' => $openingCash,
@@ -87,6 +104,7 @@ class ShiftService
             }
 
             return CashMovement::create([
+                'outlet_id' => $locked->outlet_id,
                 'cash_shift_id' => $locked->id,
                 'user_id' => $user->id,
                 'type' => $type,

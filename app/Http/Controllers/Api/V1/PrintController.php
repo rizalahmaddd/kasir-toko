@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Models\CashShift;
 use App\Models\Sale;
+use App\Support\CurrentOutlet;
 use App\Support\OpenApi\Attributes\ApiQuery;
 use App\Support\OpenApi\Attributes\ApiResponse;
 use App\Support\OpenApi\Attributes\ApiTag;
+use App\Support\OutletIdentity;
 use App\Support\PosSettings;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -17,16 +19,18 @@ class PrintController extends Controller
     /**
      * Struk thermal (HTML).
      */
-    #[ApiQuery('width', description: 'Lebar kertas, default dari Pengaturan Kasir.', enum: ['58', '80'])]
+    #[ApiQuery('width', description: 'Lebar kertas, default dari pengaturan struk outlet transaksi.', enum: ['58', '80'])]
     #[ApiResponse(mediaType: 'text/html', description: 'Halaman HTML struk tanpa toolbar.')]
     public function receipt(Request $request, Sale $sale): Response
     {
         $user = $request->user();
         abort_unless($sale->user_id === $user->id || $user->can('sales.view'), 403);
 
-        $sale->load('items', 'payments', 'cashier', 'customer');
+        $sale->load('items', 'payments', 'cashier', 'customer', 'outlet');
+        app(CurrentOutlet::class)->set($sale->outlet_id);
 
         return response(view('print.receipt', [
+            'identity' => OutletIdentity::for($sale->outlet),
             'sale' => $sale,
             'width' => in_array($request->query('width'), ['58', '80'], true) ? $request->query('width') : PosSettings::receiptWidth(),
             'autoPrint' => false,
@@ -43,9 +47,11 @@ class PrintController extends Controller
         $user = $request->user();
         abort_unless($cashShift->user_id === $user->id || $user->can('shifts.manage'), 403);
 
-        $cashShift->load('user', 'closer', 'cashMovements.user');
+        $cashShift->load('user', 'closer', 'cashMovements.user', 'outlet');
+        app(CurrentOutlet::class)->set($cashShift->outlet_id);
 
         return response(view('print.shift', [
+            'identity' => OutletIdentity::for($cashShift->outlet),
             'shift' => $cashShift,
             'summary' => $cashShift->summary(),
             'width' => PosSettings::receiptWidth(),

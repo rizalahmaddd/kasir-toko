@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Concerns;
 
+use App\Support\CurrentOutlet;
 use App\Support\CurrentTenant;
 
 /**
@@ -19,9 +20,22 @@ trait WithRealtimeRefresh
             return [];
         }
 
+        $outletChannel = app(CurrentOutlet::class)->channel();
+
         return collect($this->realtimeEvents())
             ->mapWithKeys(fn (string $event) => ["echo-private:{$channel},.{$event}" => '$refresh'])
+            ->merge($outletChannel === null ? [] : collect($this->realtimeOutletEvents())->mapWithKeys(fn (string $event) => ["echo-private:{$outletChannel},.{$event}" => '$refresh']))
             ->all();
+    }
+
+    /**
+     * Event yang hanya relevan untuk outlet yang sedang dipakai (channel outlet), mis. penjualan di layar stok.
+     *
+     * @return array<int, string>
+     */
+    protected function realtimeOutletEvents(): array
+    {
+        return [];
     }
 
     /**

@@ -89,4 +89,36 @@ class NumberFormatter
 
         return number_format($val, $val == (int) $val ? 0 : $decimals, ',', '.');
     }
+
+    /**
+     * Jumlah satuan dasar dipecah ke satuan yang lebih besar, mis. 234 tablet dengan strip (10) dan
+     * box (100) menjadi "2 box 3 strip 4 tablet". Satuan dengan faktor <= 1 dilewati.
+     *
+     * @param  iterable<array{name: string, factor: float|int|string}|object>  $units
+     */
+    public static function unitBreakdown(float|int|string $baseQuantity, string $baseUnit, iterable $units): string
+    {
+        $left = (float) $baseQuantity;
+        $sign = $left < 0 ? '-' : '';
+        $left = abs($left);
+        $parts = [];
+        $sorted = collect($units)->map(fn ($unit) => ['name' => data_get($unit, 'name'), 'factor' => (float) data_get($unit, 'factor')])
+            ->filter(fn (array $unit) => $unit['factor'] > 1)
+            ->sortByDesc('factor');
+
+        foreach ($sorted as $unit) {
+            $count = (int) floor(round($left / $unit['factor'], 6));
+
+            if ($count > 0) {
+                $parts[] = self::quantity($count).' '.$unit['name'];
+                $left = round($left - $count * $unit['factor'], 3);
+            }
+        }
+
+        if ($left > 0 || $parts === []) {
+            $parts[] = self::quantity($left).' '.$baseUnit;
+        }
+
+        return $sign.implode(' ', $parts);
+    }
 }

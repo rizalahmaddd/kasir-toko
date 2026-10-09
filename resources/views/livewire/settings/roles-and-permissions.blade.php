@@ -583,6 +583,21 @@
                     </label>
                 @endforeach
             </div>
+
+            @if ($outletChoices->isNotEmpty() && ! $editingUser->isSuperAdmin())
+                <fieldset class="space-y-2 pt-1">
+                    <legend class="text-sm font-medium text-slate-300">{{ __('Akses outlet') }}</legend>
+                    <x-checkbox-card wire:model.live="editingUserAllOutlets" :label="__('Semua outlet')" :description="__('Bisa memakai semua outlet, termasuk yang dibuat nanti.')" />
+                    @unless ($editingUserAllOutlets)
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            @foreach ($outletChoices as $outlet)
+                                <x-checkbox-card wire:key="edit-outlet-{{ $outlet->id }}" wire:model="editingUserOutlets" value="{{ $outlet->id }}" :label="$outlet->name" :description="$outlet->code" />
+                            @endforeach
+                        </div>
+                    @endunless
+                    <x-input-error :messages="$errors->get('editingUserOutlets')" class="mt-1.5" />
+                </fieldset>
+            @endif
             @endif
 
             <x-modal-actions>
@@ -633,6 +648,21 @@
                 </div>
                 <x-input-error :messages="$errors->get('newUserRoles')" class="mt-1.5" />
             </fieldset>
+
+            @if ($outletChoices->isNotEmpty())
+                <fieldset class="space-y-2">
+                    <legend class="text-sm font-medium text-slate-300">{{ __('Akses outlet') }}</legend>
+                    <x-checkbox-card wire:model.live="newUserAllOutlets" :label="__('Semua outlet')" :description="__('Bisa memakai semua outlet, termasuk yang dibuat nanti.')" />
+                    @unless ($newUserAllOutlets)
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            @foreach ($outletChoices as $outlet)
+                                <x-checkbox-card wire:key="new-outlet-{{ $outlet->id }}" wire:model="newUserOutlets" value="{{ $outlet->id }}" :label="$outlet->name" :description="$outlet->code" />
+                            @endforeach
+                        </div>
+                    @endunless
+                    <x-input-error :messages="$errors->get('newUserOutlets')" class="mt-1.5" />
+                </fieldset>
+            @endif
 
             <x-modal-actions>
                 <x-secondary-button x-on:click="$dispatch('close')" wire:click="closeCreateUserModal">{{ __('Batal') }}</x-secondary-button>

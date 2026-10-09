@@ -40,7 +40,12 @@ it('tells a blocked shop on the API how to renew', function () {
     $renewal = [
         'contact' => '0812-0000-1111',
         'payment_instructions' => 'Transfer BCA 123',
-        'plans' => [['key' => 'basic', 'label' => 'Basic', 'price' => 99000]],
+        // Paket bawaan berbayar (Pro, Lifetime) selalu ikut ditawarkan walau tidak ada di daftar yang disimpan admin.
+        'plans' => [
+            ['key' => 'basic', 'label' => 'Basic', 'price' => 99000],
+            ['key' => 'pro', 'label' => SaasPlans::DEFAULT_PLANS['pro']['label'], 'price' => SaasPlans::DEFAULT_PLANS['pro']['price']],
+            ['key' => 'lifetime', 'label' => SaasPlans::DEFAULT_PLANS['lifetime']['label'], 'price' => SaasPlans::DEFAULT_PLANS['lifetime']['price']],
+        ],
     ];
 
     $this->getJson('/api/v1/master-data/products')->assertStatus(402)->assertJsonPath('renewal', $renewal);

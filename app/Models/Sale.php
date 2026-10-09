@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use App\Enums\OrderType;
 use App\Enums\SaleStatus;
 use App\Events\SaleRecorded;
 use App\Models\Concerns\Auditable;
+use App\Models\Concerns\BelongsToOutlet;
 use App\Models\Concerns\BelongsToTenant;
 use Database\Factories\SaleFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -16,12 +18,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Sale extends Model
 {
     use Auditable;
+    use BelongsToOutlet;
     use BelongsToTenant;
 
     /** @use HasFactory<SaleFactory> */
     use HasFactory;
 
     protected $fillable = [
+        'outlet_id',
         'number',
         'client_uuid',
         'cash_shift_id',
@@ -44,6 +48,14 @@ class Sale extends Model
         'voided_at',
         'voided_by',
         'void_reason',
+        'prescription_id',
+        'flags',
+        'order_type',
+        'table_label',
+        'queue_number',
+        'service_charge_rate',
+        'service_charge_amount',
+        'customer_order_id',
     ];
 
     /**
@@ -102,6 +114,76 @@ class Sale extends Model
     }
 
     /**
+     * @return BelongsTo<Prescription, $this>
+     */
+    public function prescription(): BelongsTo
+    {
+        return $this->belongsTo(Prescription::class);
+    }
+
+    /**
+     * @return HasMany<KitchenTicket, $this>
+     */
+    public function kitchenTickets(): HasMany
+    {
+        return $this->hasMany(KitchenTicket::class);
+    }
+
+    /**
+     * @return BelongsTo<CustomerOrder, $this>
+     */
+    public function customerOrder(): BelongsTo
+    {
+        return $this->belongsTo(CustomerOrder::class);
+    }
+
+    /**
+     * @return HasMany<DeliveryNote, $this>
+     */
+    public function deliveryNotes(): HasMany
+    {
+        return $this->hasMany(DeliveryNote::class);
+    }
+
+    public function orderType(): ?OrderType
+    {
+        return OrderType::tryFrom((string) $this->order_type);
+    }
+
+    /**
+     * Penanda pesanan untuk struk dan tiket dapur, mis. "Meja 5" atau "Antrean 012".
+     */
+    public function orderLabel(): ?string
+    {
+        return match (true) {
+            filled($this->table_label) => "Meja {$this->table_label}",
+            $this->queue_number !== null => 'Antrean '.str_pad((string) $this->queue_number, 3, '0', STR_PAD_LEFT),
+            default => null,
+        };
+    }
+
+    public const FLAG_LABELS = [
+        'prescription_unverified' => 'Resep belum diverifikasi',
+        'controlled_drug_sold' => 'Obat narkotika/psikotropika terjual',
+        'expired_batch_sold' => 'Batch kedaluwarsa terjual',
+        'outlet_locked_sync' => 'Disinkron saat outlet terkunci',
+        'modifier_snapshot' => 'Pilihan tambahan sudah berubah/dihapus saat disinkron',
+        'serial_unverified' => 'Nomor seri tidak ditemukan di stok saat disinkron',
+        'credit_limit_exceeded' => 'Kasbon melewati batas pelanggan (dari antrean offline)',
+        'not_sold_at_outlet' => 'Produk yang tidak dijual di outlet ini terjual (dari antrean offline)',
+    ];
+
+    /**
+     * Catatan transaksi yang perlu ditinjau, mis. transaksi offline yang lolos aturan resep atau kedaluwarsa.
+     *
+     * @return list<string>
+     */
+    public function flagLabels(): array
+    {
+        return array_map(fn (string $flag) => self::FLAG_LABELS[$flag] ?? $flag, $this->flags ?? []);
+    }
+
+    /**
      * @param  Builder<Sale>  $query
      */
     public function scopeCompleted(Builder $query): void
@@ -135,6 +217,10 @@ class Sale extends Model
             'due_amount' => 'integer',
             'sold_at' => 'datetime',
             'voided_at' => 'datetime',
+            'flags' => 'array',
+            'queue_number' => 'integer',
+            'service_charge_rate' => 'decimal:2',
+            'service_charge_amount' => 'integer',
         ];
     }
 }

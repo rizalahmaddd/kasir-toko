@@ -178,6 +178,7 @@ test('every page still renders when every other feature is switched off', functi
     foreach ($pages as $route) {
         $keep = Features::featuresForRoute($route->getName());
         Features::setDisabled($allFeatures->diff($keep)->values()->all());
+        Features::setEnabled(array_values(array_filter($keep, Features::isOptIn(...))));
 
         $this->get(route($route->getName()))->assertOk();
     }
@@ -208,6 +209,8 @@ test('every detail page still renders with seeded data when every other feature 
         if ($record === null) {
             continue;
         }
+
+        Features::setEnabled(array_values(array_filter(Features::featuresForRoute($route->getName()), Features::isOptIn(...))));
 
         foreach ([[], $allFeatures->diff(Features::featuresForRoute($route->getName()))->values()->all()] as $disabled) {
             Features::setDisabled($disabled);
@@ -278,7 +281,7 @@ test('every app route belongs to a feature unless it is deliberately always open
     $alwaysOpen = [
         'dashboard', 'profile', 'settings.features', 'settings.subscription*', 'platform.*', 'subscription.inactive', 'onboarding', 'branding.logo',
         'login', 'register', 'password.*', 'verification.*', 'auth.*', 'legal.*', 'webhooks.*',
-        '*livewire.*', 'boost.*', 'storage.*',
+        '*livewire.*', 'boost.*', 'storage.*', 'app.download*', 'app-releases.*',
         // API routes name their feature through the `feature:` middleware instead (tests/Feature/Api/ApiDocumentationTest.php).
         'api.*', 'sanctum.*', 'scalar*',
     ];

@@ -15,17 +15,28 @@ class SaasPlans
 {
     public const SETTING_KEY = 'saas.plans';
 
+    public const DEFAULT_PLANS = [
+        'trial' => ['label' => 'Uji Coba Pro', 'price' => null, 'max_users' => null, 'max_products' => null, 'max_outlets' => 1],
+        'free' => ['label' => 'Gratis', 'price' => 0, 'max_users' => null, 'max_products' => null, 'max_outlets' => 1],
+        'pro' => ['label' => 'Pro', 'price' => 20000, 'yearly_price' => 199000, 'max_users' => null, 'max_products' => null, 'max_outlets' => 5],
+        'lifetime' => ['label' => 'Lifetime (Permanen)', 'price' => 499000, 'yearly_price' => null, 'max_users' => null, 'max_products' => null, 'max_outlets' => 5],
+    ];
+
     /**
-     * @return array<string, array{label: string, price: ?int, max_users: ?int, max_products: ?int}>
+     * @return array<string, array{label: string, price: ?int, max_users: ?int, max_products: ?int, max_outlets: int}>
      */
     public static function all(): array
     {
         $stored = json_decode((string) Setting::platform(self::SETTING_KEY), true);
-        $plans = is_array($stored) && $stored !== [] ? $stored : config('saas.plans', []);
+        $sourcePlans = config('saas.plans', []);
+        $plans = is_array($stored) && $stored !== [] ? $stored : ($sourcePlans ?: self::DEFAULT_PLANS);
 
-        // Otomatis sertakan paket bawaan Lifetime jika database lama belum memilikinya
-        if (isset($plans[Tenant::PLAN_PRO]) && ! isset($plans[Tenant::PLAN_LIFETIME]) && isset(config('saas.plans')[Tenant::PLAN_LIFETIME])) {
-            $plans[Tenant::PLAN_LIFETIME] = config('saas.plans')[Tenant::PLAN_LIFETIME];
+        // Pastikan paket bawaan (terutama free dan lifetime) selalu ada meski DB atau config server versi lama
+        $combinedDefaults = array_merge(self::DEFAULT_PLANS, $sourcePlans);
+        foreach ($combinedDefaults as $configKey => $configPlan) {
+            if (! isset($plans[$configKey])) {
+                $plans[$configKey] = $configPlan;
+            }
         }
 
         return collect($plans)
@@ -37,6 +48,7 @@ class SaasPlans
                 'yearly_discount' => self::nullableInt($plan['yearly_discount'] ?? null),
                 'max_users' => self::nullableInt($plan['max_users'] ?? null),
                 'max_products' => self::nullableInt($plan['max_products'] ?? null),
+                'max_outlets' => max(1, self::nullableInt($plan['max_outlets'] ?? null) ?? self::DEFAULT_PLANS[$key]['max_outlets'] ?? 1),
             ])
             ->all();
     }
@@ -87,7 +99,7 @@ class SaasPlans
     }
 
     /**
-     * @return array{label: string, price: ?int, max_users: ?int, max_products: ?int}|null
+     * @return array{label: string, price: ?int, max_users: ?int, max_products: ?int, max_outlets: int}|null
      */
     public static function find(?string $key): ?array
     {
@@ -95,7 +107,7 @@ class SaasPlans
     }
 
     /**
-     * @param  array<string, array{label: string, price: ?int, max_users: ?int, max_products: ?int}>  $plans
+     * @param  array<string, array{label: string, price: ?int, max_users: ?int, max_products: ?int, max_outlets?: int}>  $plans
      */
     public static function save(array $plans): void
     {

@@ -2,13 +2,17 @@
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\WithOutletFilter;
 use App\Livewire\Concerns\WithRealtimeRefresh;
 use App\Models\CashShift;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Models\StockCount;
 use App\Models\User;
+use App\Support\CurrentOutlet;
+use App\Support\Features;
 use App\Support\NumberFormatter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -23,13 +27,21 @@ use Spatie\Activitylog\Models\Activity;
 #[Title('Dashboard')]
 class Dashboard extends Component
 {
-    use WithRealtimeRefresh;
+    use WithOutletFilter, WithRealtimeRefresh;
 
     private function seesAllSales(): bool
     {
         $user = Auth::user();
 
         return $user->can('sales.view') || $user->can('reports.sales.view');
+    }
+
+    /**
+     * Stok selalu milik satu outlet; saat melihat semua outlet, yang dipakai outlet aktif.
+     */
+    private function stockOutletId(): int
+    {
+        return $this->outletFilterId() ?? app(CurrentOutlet::class)->idOrPrimary() ?? 0;
     }
 
     /**
@@ -42,10 +54,10 @@ class Dashboard extends Component
         $user = Auth::user();
 
         if ($this->seesAllSales()) {
-            return Sale::query()->completed();
+            return Sale::query()->forOutlet($this->outletFilterId())->completed();
         }
 
-        return $user->can('pos.sell') ? Sale::query()->completed()->where('user_id', $user->id) : null;
+        return $user->can('pos.sell') ? Sale::query()->forOutlet($this->outletFilterId())->completed()->where('user_id', $user->id) : null;
     }
 
     /**
@@ -107,7 +119,7 @@ class Dashboard extends Component
         }
 
         if ($user->can('view-master-data')) {
-            $low = Product::query()->where('is_active', true)->lowStock()->count();
+            $low = Product::query()->where('is_active', true)->lowStock($this->stockOutletId())->count();
             $stats[] = [
                 'title' => 'Stok menipis / habis',
                 'value' => NumberFormatter::quantity($low),
@@ -119,7 +131,7 @@ class Dashboard extends Component
         }
 
         if ($user->can('receivables.manage')) {
-            $due = (int) Sale::query()->completed()->sum('due_amount');
+            $due = (int) Sale::query()->forOutlet($this->outletFilterId())->completed()->sum('due_amount');
             $stats[] = [
                 'title' => 'Kasbon belum lunas',
                 'value' => NumberFormatter::currency($due),
@@ -164,7 +176,7 @@ class Dashboard extends Component
             return null;
         }
 
-        $totals = Sale::query()->completed()
+        $totals = Sale::query()->forOutlet($this->outletFilterId())->completed()
             ->where('sold_at', '>=', today()->subDays(6))
             ->get(['sold_at', 'total'])
             ->groupBy(fn (Sale $sale) => $sale->sold_at->toDateString())
@@ -185,7 +197,9 @@ class Dashboard extends Component
             return null;
         }
 
-        return Product::query()->where('is_active', true)->lowStock()->orderBy('stock')->limit(6)->get();
+        $outletId = $this->stockOutletId();
+
+        return Product::query()->withOutletData($outletId)->where('is_active', true)->lowStock($outletId)->orderBy('outlet_stock')->limit(6)->get();
     }
 
     /**
@@ -201,6 +215,7 @@ class Dashboard extends Component
 
         return Sale::query()
             ->with('customer')
+            ->forOutlet($this->outletFilterId())
             ->when(! $user->can('sales.view'), fn (Builder $query) => $query->where('user_id', $user->id))
             ->latest('sold_at')
             ->latest('id')
@@ -269,7 +284,12 @@ class Dashboard extends Component
             'recentSales' => $this->recentSales(),
             'shortcuts' => $this->shortcuts(),
             'activities' => $this->recentActivities(),
-            'openShifts' => Auth::user()->can('shifts.manage') ? CashShift::query()->open()->with('user')->get() : collect(),
+            'openCounts' => Auth::user()->can('inventory.opname.count') && Features::enabled('inventory.opname')
+                ? StockCount::query()->open()->when($this->outletFilterId(), fn ($query, int $outletId) => $query->where('outlet_id', $outletId))
+                    ->withCount(['items', 'items as counted_items_count' => fn ($query) => $query->whereNotNull('counted_qty')])->oldest('id')->get()
+                : collect(),
+            'openShifts' => Auth::user()->can('shifts.manage') ? CashShift::query()->forOutlet($this->outletFilterId())->open()->with('user')->get() : collect(),
+            'outletChoices' => $this->outletFilterChoices(),
         ]);
     }
 }

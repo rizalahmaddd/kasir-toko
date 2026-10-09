@@ -4,7 +4,9 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
+        "dev": "vite",
+        "test:js": "node --test tests/js/*.test.mjs",
+        "test:e2e": "playwright test"
     },
     "devDependencies": {
         "@playwright/test": "^1.63.0",

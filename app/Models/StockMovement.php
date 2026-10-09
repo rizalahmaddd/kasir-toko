@@ -3,16 +3,20 @@
 namespace App\Models;
 
 use App\Enums\StockMovementType;
+use App\Models\Concerns\BelongsToOutlet;
 use App\Models\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class StockMovement extends Model
 {
+    use BelongsToOutlet;
     use BelongsToTenant;
 
     protected $fillable = [
+        'outlet_id',
         'product_id',
         'user_id',
         'type',
@@ -23,6 +27,7 @@ class StockMovement extends Model
         'reference_type',
         'reference_id',
         'note',
+        'occurred_at',
     ];
 
     /**
@@ -42,6 +47,16 @@ class StockMovement extends Model
     }
 
     /**
+     * Batch yang terkena mutasi ini; jumlahnya bertanda sama dengan quantity.
+     *
+     * @return HasMany<StockMovementBatch, $this>
+     */
+    public function batchLines(): HasMany
+    {
+        return $this->hasMany(StockMovementBatch::class);
+    }
+
+    /**
      * @return MorphTo<Model, $this>
      */
     public function reference(): MorphTo
@@ -57,6 +72,7 @@ class StockMovement extends Model
             'stock_before' => 'decimal:3',
             'stock_after' => 'decimal:3',
             'unit_cost' => 'integer',
+            'occurred_at' => 'datetime',
         ];
     }
 }

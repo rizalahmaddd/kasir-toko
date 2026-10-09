@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Events\TenantRegistered;
+use App\Models\Outlet;
 use App\Models\Setting;
 use App\Models\Tenant;
 use App\Models\User;
@@ -17,7 +18,7 @@ use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
 /**
- * Menyiapkan toko baru: baris tenant, peran bawaan beserta izinnya, identitas toko, dan akun
+ * Menyiapkan toko baru: baris tenant, peran bawaan beserta izinnya, identitas toko, outlet utama, dan akun
  * pemiliknya (peran superadmin di toko itu). Dipakai pendaftaran, app:install, dan seeder.
  */
 class TenantProvisioner
@@ -42,8 +43,14 @@ class TenantProvisioner
                 $this->seedRoles();
                 Setting::put('company_name', $shopName);
 
+                $outlet = Outlet::query()->create([
+                    'name' => mb_substr($shopName, 0, 100),
+                    'code' => Outlet::DEFAULT_CODE,
+                    'is_primary' => true,
+                ]);
+
                 $user = User::query()->create($owner);
-                $user->forceFill(['email_verified_at' => now()])->save();
+                $user->forceFill(['email_verified_at' => now(), 'all_outlets' => true, 'default_outlet_id' => $outlet->id])->save();
                 $user->assignRole('superadmin');
 
                 TenantRegistered::dispatch($tenant, $user);

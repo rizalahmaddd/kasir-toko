@@ -31,7 +31,7 @@ it('creates the preset categories, settings, and feature toggles for its tenant 
 
     inTenant($tenant, function () use ($type, $result) {
         expect(Category::query()->orderBy('sort_order')->pluck('name')->all())->toBe(StorePresets::categories($type))
-            ->and(Product::query()->count())->toBe(StorePresets::sampleProductCount($type))
+            ->and(Product::query()->whereNull('parent_id')->count())->toBe(StorePresets::sampleProductCount($type))
             ->and($result['products_created'])->toBe(StorePresets::sampleProductCount($type));
 
         foreach (StorePresets::settings($type) as $key => $value) {
@@ -108,7 +108,7 @@ it('skips categories and products that already exist when applied again', functi
 
     expect($first['categories_created'])->toBe(count(StorePresets::categories(StoreType::Warung)) - 1)
         ->and($first['products_created'])->toBe(StorePresets::sampleProductCount(StoreType::Warung) - 1)
-        ->and($second)->toBe(['categories_created' => 0, 'products_created' => 0, 'products_skipped' => 0])
+        ->and($second)->toMatchArray(['categories_created' => 0, 'products_created' => 0, 'products_skipped' => 0])
         ->and(inTenant($tenant, fn () => Product::query()->where('name', 'Beras Medium 1kg')->count()))->toBe(1);
 });
 

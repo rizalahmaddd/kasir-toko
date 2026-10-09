@@ -103,7 +103,7 @@ class PlatformDemoSeeder extends Seeder
     {
         $shifts = app(ShiftService::class);
         $sales = app(SaleService::class);
-        $products = Product::query()->where('is_active', true)
+        $products = Product::query()->with('modifierGroups.modifiers')->where('is_active', true)
             ->when(! PosSettings::allowNegativeStock(), fn ($query) => $query->where('track_stock', false))
             ->get();
 
@@ -127,10 +127,13 @@ class PlatformDemoSeeder extends Seeder
                     'quantity' => mt_rand(1, 2),
                     'price' => $product->price,
                     'discount' => 0,
+                    'modifiers' => $product->modifierGroups->where('is_active', true)->filter(fn ($group) => $group->min_select > 0)
+                        ->map(fn ($group) => $group->modifiers->first())->filter()
+                        ->map(fn ($modifier) => ['id' => $modifier->id, 'name' => $modifier->name, 'price' => (int) $modifier->price])->values()->all(),
                 ])->values()->all();
 
                 // Dilebihkan untuk pajak toko (mis. PB1 kafe); kembaliannya dihitung kasir.
-                $total = collect($items)->sum(fn (array $item) => $item['price'] * $item['quantity']) * 1.2;
+                $total = collect($items)->sum(fn (array $item) => ($item['price'] + array_sum(array_column($item['modifiers'], 'price'))) * $item['quantity']) * 1.2;
 
                 $sales->checkout($cashier, [
                     'client_uuid' => (string) Str::uuid(),

@@ -92,6 +92,22 @@
                         </div>
                     @endif
                 </div>
+
+                <div class="flex-1 sm:w-48 rounded-xl border border-slate-200 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-950/50 p-3 sm:p-3.5">
+                    <div class="flex items-center justify-between gap-1.5 text-xs text-slate-600 dark:text-slate-400 mb-1.5">
+                        <span class="inline-flex items-center gap-1.5 font-medium truncate">
+                            <i data-lucide="store" class="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0"></i>
+                            Outlet
+                        </span>
+                        <span class="font-mono text-xs font-semibold text-slate-900 dark:text-slate-200 shrink-0">
+                            {{ $usage['outlets']['current'] }}
+                            <span class="text-slate-500 dark:text-slate-400 font-normal">/ {{ $usage['outlets']['limit'] }}</span>
+                        </span>
+                    </div>
+                    <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+                        <div class="h-full {{ $usage['outlets']['current'] > $usage['outlets']['limit'] ? 'bg-amber-500' : 'bg-emerald-600 dark:bg-emerald-500' }} rounded-full transition-all" style="width: {{ $usage['outlets']['percent'] }}%"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

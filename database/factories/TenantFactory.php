@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Outlet;
 use App\Models\Tenant;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
@@ -25,6 +26,18 @@ class TenantFactory extends Factory
             'plan' => 'pro',
             'onboarded_at' => now(),
         ];
+    }
+
+    /**
+     * Setiap toko selalu punya outlet utama, seperti hasil pendaftaran.
+     */
+    public function configure(): static
+    {
+        return $this->afterCreating(function (Tenant $tenant) {
+            if (! Outlet::query()->withoutGlobalScopes()->where('tenant_id', $tenant->id)->exists()) {
+                Outlet::factory()->primary()->create(['tenant_id' => $tenant->id, 'name' => $tenant->name]);
+            }
+        });
     }
 
     public function trial(?int $daysLeft = 14): static

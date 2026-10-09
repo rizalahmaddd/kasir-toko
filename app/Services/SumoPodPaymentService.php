@@ -16,17 +16,23 @@ class SumoPodPaymentService
 
     public function apiKey(): ?string
     {
-        return Setting::platform('sumopod.api_key') ?: config('services.sumopod.api_key');
+        $setting = Setting::platform('sumopod.api_key');
+
+        return filled($setting) ? trim($setting) : config('services.sumopod.api_key');
     }
 
     public function webhookSecret(): ?string
     {
-        return Setting::platform('sumopod.webhook_secret') ?: config('services.sumopod.webhook_secret');
+        $setting = Setting::platform('sumopod.webhook_secret');
+
+        return filled($setting) ? trim($setting) : config('services.sumopod.webhook_secret');
     }
 
     public function apiUrl(): string
     {
-        return Setting::platform('sumopod.api_url') ?: config('services.sumopod.api_url', self::DEFAULT_API_URL);
+        $setting = Setting::platform('sumopod.api_url');
+
+        return filled($setting) ? trim($setting) : config('services.sumopod.api_url', self::DEFAULT_API_URL);
     }
 
     public function isConfigured(): bool

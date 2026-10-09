@@ -4,7 +4,7 @@
     $usage = $this->usage;
     $owner = $this->owner;
     $reason = $tenant->blockedReason();
-    $limits = ['users' => $tenant->limit('users'), 'products' => $tenant->limit('products')];
+    $limits = ['users' => $tenant->limit('users'), 'products' => $tenant->limit('products'), 'outlets' => $tenant->maxOutlets()];
 @endphp
 
 <div class="space-y-4 sm:space-y-6">
@@ -84,7 +84,8 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+        <x-dashboard.stat title="Outlet aktif" :value="$usage['outlets'].' / '.$limits['outlets']" icon="store" :tone="$usage['outlets'] > $limits['outlets'] ? 'amber' : 'slate'" :subtitle="$tenant->max_outlets_override !== null ? 'Batas khusus toko' : ($usage['outlets'] > $limits['outlets'] ? 'Melebihi batas, sisanya terkunci' : 'Batas paket')" />
         <x-dashboard.stat title="Pengguna" :value="$usage['users'].($limits['users'] ? ' / '.$limits['users'] : '')" icon="users" :tone="$limits['users'] && $usage['users'] >= $limits['users'] ? 'amber' : 'slate'" :subtitle="$limits['users'] ? 'Batas paket' : 'Tanpa batas'" />
         <x-dashboard.stat title="Produk" :value="Num::quantity($usage['products']).($limits['products'] ? ' / '.Num::quantity($limits['products']) : '')" icon="package" :tone="$limits['products'] && $usage['products'] >= $limits['products'] ? 'amber' : 'slate'" :subtitle="$limits['products'] ? 'Batas paket' : 'Tanpa batas'" />
         <x-dashboard.stat title="Omzet 30 Hari" :value="Num::currency($usage['revenue_30d'])" icon="trending-up" :subtitle="Num::quantity($usage['sales_30d']).' transaksi'" />
@@ -218,6 +219,12 @@
                     <x-text-input wire:model="access_ends_at" id="access_ends_at" type="date" class="w-full" />
                     <p class="mt-1 text-[11px] text-slate-500">Kosongkan untuk tanpa batas waktu.</p>
                     <x-input-error :messages="$errors->get('access_ends_at')" class="mt-1.5" />
+                </div>
+                <div>
+                    <x-input-label for="maxOutletsOverride" value="Batas outlet khusus toko ini" />
+                    <x-text-input wire:model="maxOutletsOverride" id="maxOutletsOverride" inputmode="numeric" class="w-full tabular-nums" placeholder="Ikut paket ({{ \App\Support\SaasPlans::find($tenant->plan)['max_outlets'] ?? 1 }})" />
+                    <p class="mt-1 text-[11px] text-slate-500">Kosongkan untuk mengikuti batas paket. Dipakai untuk kesepakatan khusus atau mempertahankan outlet toko lama saat batas paket diturunkan.</p>
+                    <x-input-error :messages="$errors->get('maxOutletsOverride')" class="mt-1.5" />
                 </div>
                 @include('livewire.platform.partials.payment-fields')
                 <x-modal-actions>

@@ -21,6 +21,8 @@ class CategoryRequest extends FormRequest
             'name' => ['required', 'string', 'max:100', TenantRule::unique('categories', 'name')->ignore($this->route('category')?->id)],
             'sort_order' => ['integer', 'min:0', 'max:9999'],
             'is_active' => ['boolean'],
+            'outlet_ids' => ['sometimes', 'array'],
+            'outlet_ids.*' => ['integer', TenantRule::exists('outlets', 'id')],
         ];
     }
 }

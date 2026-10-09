@@ -1,8 +1,13 @@
 <?php
 
+use App\Models\Outlet;
+use App\Models\Product;
+use App\Models\ProductStock;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Pos\PosException;
 use App\Services\TenantProvisioner;
+use App\Support\CurrentOutlet;
 use App\Support\CurrentTenant;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\PermissionSeeder;
@@ -100,6 +105,28 @@ function apiActingAs(string $role): User
     return $user;
 }
 
+/**
+ * Outlet tambahan di toko aktif tes; outlet utama sudah dibuat oleh TenantFactory.
+ *
+ * @param  array<string, mixed>  $attributes
+ */
+function makeOutlet(array $attributes = []): Outlet
+{
+    $outlet = Outlet::factory()->create($attributes);
+
+    // Akses dibaca sekali per request; di tes yang sudah login, outlet baru harus ikut terbaca.
+    if ($user = auth()->user()) {
+        app(CurrentOutlet::class)->loadAccess($user);
+    }
+
+    return $outlet;
+}
+
+function primaryOutlet(): Outlet
+{
+    return Outlet::query()->where('is_primary', true)->firstOrFail();
+}
+
 function actingAsAdmin(): User
 {
     return actingAsRole('admin');
@@ -162,4 +189,29 @@ function provisionedShop(string $name = 'Toko Pelanggan'): Tenant
     app(CurrentTenant::class)->set($previous);
 
     return $tenant;
+}
+
+/**
+ * Set stok produk di satu outlet langsung, lalu samakan products.stock dengan totalnya.
+ */
+function setOutletStock(Product $product, int $outletId, float $stock): void
+{
+    ProductStock::query()->updateOrCreate(['product_id' => $product->id, 'outlet_id' => $outletId], ['stock' => $stock]);
+    $product->forceFill(['stock' => ProductStock::query()->where('product_id', $product->id)->sum('stock')])->saveQuietly();
+}
+
+function outletStockQty(Product $product, int $outletId): float
+{
+    return (float) ProductStock::query()->where('product_id', $product->id)->where('outlet_id', $outletId)->value('stock');
+}
+
+function posRejection(callable $callback): PosException
+{
+    try {
+        $callback();
+    } catch (PosException $exception) {
+        return $exception;
+    }
+
+    throw new RuntimeException('Expected the action to be rejected.');
 }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api\V1\MasterData;
 
+use App\Services\ProductCapabilityData;
 use App\Support\TenantRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -17,6 +18,13 @@ class ProductRequest extends FormRequest
         if (is_string($this->sku)) {
             $this->merge(['sku' => strtoupper(trim($this->sku))]);
         }
+    }
+
+    public function after(): array
+    {
+        return [
+            fn () => ProductCapabilityData::ensureUniqueBarcodes($this->route('product')?->id, $this->input('barcode'), (array) $this->input('units', [])),
+        ];
     }
 
     /**
@@ -41,6 +49,12 @@ class ProductRequest extends FormRequest
             'stock' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
             'min_stock' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
             'is_active' => ['boolean'],
+            'outlet_prices' => ['nullable', 'array', 'max:50'],
+            'outlet_prices.*.outlet_id' => ['required', 'integer', TenantRule::exists('outlets', 'id')],
+            'outlet_prices.*.price' => ['nullable', 'integer', 'min:0', 'max:999999999999'],
+            'batch_number' => ['nullable', 'string', 'max:50'],
+            'expires_at' => ['nullable', 'date'],
+            ...ProductCapabilityData::rules(),
         ];
     }
 
@@ -54,6 +68,7 @@ class ProductRequest extends FormRequest
             'sku.regex' => 'SKU hanya boleh huruf, angka, titik, garis bawah, strip, dan garis miring.',
             'barcode.unique' => 'Barcode ini sudah dipakai produk lain.',
             'price.required' => 'Harga jual wajib diisi.',
+            ...ProductCapabilityData::messages(),
         ];
     }
 }

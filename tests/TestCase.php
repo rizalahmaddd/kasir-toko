@@ -3,6 +3,8 @@
 namespace Tests;
 
 use App\Models\Tenant;
+use App\Models\User;
+use App\Support\CurrentOutlet;
 use App\Support\CurrentTenant;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -40,6 +42,12 @@ abstract class TestCase extends BaseTestCase
     {
         $tenantId = $user->getAttribute('tenant_id');
         app(CurrentTenant::class)->set($tenantId === null ? null : (int) $tenantId);
+
+        if ($tenantId !== null && $user instanceof User) {
+            $outlets = app(CurrentOutlet::class);
+            $outlets->loadAccess($user);
+            $outlets->set($outlets->pickDefault([$user->default_outlet_id]));
+        }
 
         return parent::be($user, $guard);
     }

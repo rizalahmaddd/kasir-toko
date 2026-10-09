@@ -220,6 +220,27 @@ new class extends Component {
             </div>
         @endif
 
+        {{-- Tombol Unduh Aplikasi Android --}}
+        <div class="sidebar-download shrink-0 px-3 py-1.5 border-t border-slate-800/80 [.sidebar-collapsed_&]:px-2.5">
+            <a href="{{ route('app.download') }}" target="_blank"
+                class="block rounded-xl border border-slate-800/80 bg-slate-950/40 p-2 [.sidebar-collapsed_&]:p-2 transition hover:border-slate-700/80 hover:bg-slate-950/70 group"
+                :title="collapsed ? 'Unduh Aplikasi Android APK' : ''">
+                <div x-show="!collapsed" data-rail-hidden class="flex items-center gap-2.5 min-w-0">
+                    <div class="w-6 h-6 rounded-md bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0">
+                        <i data-lucide="smartphone" class="w-3.5 h-3.5"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-[11px] font-bold text-slate-200 truncate leading-tight">Unduh Aplikasi</div>
+                        <div class="text-[9px] text-slate-400 truncate">Android APK</div>
+                    </div>
+                    <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-300 transition shrink-0"></i>
+                </div>
+                <div x-show="collapsed" class="flex items-center justify-center py-0.5">
+                    <i data-lucide="smartphone" class="w-4 h-4 text-emerald-400"></i>
+                </div>
+            </a>
+        </div>
+
         <!-- User footer -->
         <div class="sidebar-user shrink-0 border-t border-slate-800/80" x-data="{
             open: false,
@@ -262,6 +283,7 @@ new class extends Component {
                     class="absolute bottom-full left-2 right-2 mb-1.5 rounded-xl shadow-xl bg-slate-900 border border-slate-800 overflow-hidden z-[60]"
                     :style="menuStyle" style="display: none;" @click="open = false">
                     <x-dropdown-link :href="route('profile')" wire:navigate>{{ __('Profil Saya') }}</x-dropdown-link>
+                    <x-dropdown-link :href="route('app.download')" target="_blank">{{ __('Unduh Aplikasi Android') }}</x-dropdown-link>
                     @if (auth()->user()->isSuperAdmin())
                         <x-dropdown-link :href="route('settings.subscription')" wire:navigate class="text-amber-400 hover:text-amber-300 flex items-center justify-between">
                             <span>{{ __('Paket & Langganan') }}</span>

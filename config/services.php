@@ -65,4 +65,8 @@ return [
         'api_url' => env('SUMOPOD_API_URL', 'https://api-pay-sandbox.sumopod.com/api/v1/payments'),
     ],
 
+    'app_release' => [
+        'upload_token' => env('APP_RELEASE_UPLOAD_TOKEN'),
+    ],
+
 ];

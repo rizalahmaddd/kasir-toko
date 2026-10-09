@@ -6,6 +6,7 @@ use App\Enums\CashMovementType;
 use App\Enums\PaymentMethod;
 use App\Enums\SaleStatus;
 use App\Models\Concerns\Auditable;
+use App\Models\Concerns\BelongsToOutlet;
 use App\Models\Concerns\BelongsToTenant;
 use Database\Factories\CashShiftFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -17,12 +18,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class CashShift extends Model
 {
     use Auditable;
+    use BelongsToOutlet;
     use BelongsToTenant;
 
     /** @use HasFactory<CashShiftFactory> */
     use HasFactory;
 
     protected $fillable = [
+        'outlet_id',
         'number',
         'user_id',
         'opened_at',

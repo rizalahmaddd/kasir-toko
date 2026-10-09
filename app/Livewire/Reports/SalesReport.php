@@ -6,11 +6,14 @@ use App\Enums\PaymentMethod;
 use App\Enums\SaleStatus;
 use App\Livewire\Concerns\WithDataTable;
 use App\Livewire\Concerns\WithDateRangeFilter;
+use App\Livewire\Concerns\WithOutletFilter;
 use App\Livewire\Concerns\WithRealtimeRefresh;
+use App\Models\Outlet;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\SalePayment;
 use App\Models\User;
+use App\Support\CurrentOutlet;
 use App\Support\NumberFormatter;
 use Carbon\CarbonPeriod;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -28,7 +31,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 #[Title('Laporan Penjualan')]
 class SalesReport extends Component
 {
-    use WithDataTable, WithDateRangeFilter, WithRealtimeRefresh;
+    use WithDataTable, WithDateRangeFilter, WithOutletFilter, WithRealtimeRefresh;
 
     /**
      * Tab aktif tampilan laporan:
@@ -104,6 +107,11 @@ class SalesReport extends Component
         abort_unless(auth()->user()->can('reports.sales.view'), 403);
     }
 
+    public function updatingOutletFilter(): void
+    {
+        $this->resetPage('transactionsPage');
+    }
+
     public function setTab(string $tab): void
     {
         $this->activeTab = in_array($tab, ['overview', 'daily', 'transactions', 'products'], true) ? $tab : 'overview';
@@ -160,6 +168,7 @@ class SalesReport extends Component
         $this->cashierId = '';
         $this->paymentMethod = '';
         $this->status = '';
+        $this->outletFilter = '';
         $this->search = '';
         $this->productSearch = '';
         $this->resetPage('transactionsPage');
@@ -194,6 +203,7 @@ class SalesReport extends Component
     protected function salesQuery(bool $onlyCompleted = true): Builder
     {
         return Sale::query()
+            ->forOutlet($this->outletFilterId())
             ->when($onlyCompleted && $this->status !== SaleStatus::Voided->value, fn (Builder $q) => $q->completed())
             ->when($this->status === SaleStatus::Voided->value, fn (Builder $q) => $q->where('status', SaleStatus::Voided->value))
             ->when($this->status === 'due', fn (Builder $q) => $q->completed()->where('due_amount', '>', 0))
@@ -247,6 +257,7 @@ class SalesReport extends Component
 
         // Transaksi dibatalkan (voided)
         $voidedQuery = Sale::query()
+            ->forOutlet($this->outletFilterId())
             ->where('status', SaleStatus::Voided->value)
             ->whereBetween('sold_at', [$this->from.' 00:00:00', $this->to.' 23:59:59'])
             ->when(ctype_digit($this->cashierId), fn (Builder $q) => $q->where('user_id', (int) $this->cashierId));
@@ -271,6 +282,7 @@ class SalesReport extends Component
         $prevFrom = $prevTo->copy()->subDays($diffDays - 1);
 
         $prevSales = Sale::query()
+            ->forOutlet($this->outletFilterId())
             ->completed()
             ->whereBetween('sold_at', [$prevFrom->toDateString().' 00:00:00', $prevTo->toDateString().' 23:59:59'])
             ->when(ctype_digit($this->cashierId), fn (Builder $q) => $q->where('user_id', (int) $this->cashierId))
@@ -479,7 +491,7 @@ class SalesReport extends Component
     protected function paymentsByMethod(): Collection
     {
         return SalePayment::query()
-            ->whereHas('sale', fn (Builder $query) => $query->completed())
+            ->whereHas('sale', fn (Builder $query) => $query->completed()->forOutlet($this->outletFilterId()))
             ->whereBetween('paid_at', [$this->from.' 00:00:00', $this->to.' 23:59:59'])
             ->selectRaw('method, SUM(amount) as total, COUNT(*) as count')
             ->groupBy('method')
@@ -487,6 +499,41 @@ class SalesReport extends Component
             ->map(fn (SalePayment $row) => ['method' => $row->method, 'total' => (int) $row->getAttribute('total'), 'count' => (int) $row->getAttribute('count')])
             ->sortByDesc('total')
             ->values();
+    }
+
+    /**
+     * Perbandingan outlet (omzet, laba kotor, jumlah transaksi) untuk periode dan filter yang sama;
+     * hanya diisi saat melihat semua outlet pada toko multi-outlet.
+     *
+     * @return Collection<int, array{name: string, count: int, revenue: int, profit: int}>
+     */
+    protected function byOutlet(): Collection
+    {
+        if (! $this->isViewingAllOutlets() || ! app(CurrentOutlet::class)->isMultiOutlet()) {
+            return collect();
+        }
+
+        $rows = $this->sales()->reorder()->selectRaw('outlet_id, COUNT(*) as count, COALESCE(SUM(total), 0) as revenue, COALESCE(SUM(tax_amount), 0) as tax')->groupBy('outlet_id')->toBase()->get()->keyBy('outlet_id');
+        $cogs = SaleItem::query()
+            ->join('sales', 'sales.id', '=', 'sale_items.sale_id')
+            ->whereIn('sale_items.sale_id', $this->sales()->reorder()->select('sales.id'))
+            ->selectRaw('sales.outlet_id as outlet_id, COALESCE(SUM(sale_items.cost_price * sale_items.quantity), 0) as cogs')
+            ->groupBy('sales.outlet_id')
+            ->toBase()
+            ->get()
+            ->keyBy('outlet_id');
+
+        return Outlet::query()->byPriority()->get()->map(function (Outlet $outlet) use ($rows, $cogs) {
+            $row = $rows->get($outlet->id);
+            $revenue = (int) ($row->revenue ?? 0);
+
+            return [
+                'name' => $outlet->name,
+                'count' => (int) ($row->count ?? 0),
+                'revenue' => $revenue,
+                'profit' => $revenue - (int) ($row->tax ?? 0) - (int) round((float) ($cogs->get($outlet->id)->cogs ?? 0)),
+            ];
+        })->values();
     }
 
     /**
@@ -608,6 +655,7 @@ class SalesReport extends Component
 
         return Sale::query()
             ->with(['cashier', 'customer', 'payments', 'items'])
+            ->forOutlet($this->outletFilterId())
             ->whereBetween('sold_at', [$this->from.' 00:00:00', $this->to.' 23:59:59'])
             ->when(ctype_digit($this->cashierId), fn (Builder $q) => $q->where('user_id', (int) $this->cashierId))
             ->when(PaymentMethod::tryFrom($this->paymentMethod), fn (Builder $q, PaymentMethod $method) => $q->whereHas('payments', fn (Builder $pq) => $pq->where('method', $method->value)))
@@ -741,6 +789,7 @@ class SalesReport extends Component
         $term = trim($this->search);
         $sales = Sale::query()
             ->with(['cashier', 'customer', 'payments', 'items'])
+            ->forOutlet($this->outletFilterId())
             ->whereBetween('sold_at', [$this->from.' 00:00:00', $this->to.' 23:59:59'])
             ->when(ctype_digit($this->cashierId), fn (Builder $q) => $q->where('user_id', (int) $this->cashierId))
             ->when(PaymentMethod::tryFrom($this->paymentMethod), fn (Builder $q, PaymentMethod $method) => $q->whereHas('payments', fn (Builder $pq) => $pq->where('method', $method->value)))
@@ -833,6 +882,8 @@ class SalesReport extends Component
             'byCategory' => $byCategory,
             'categoryTotal' => max(1, (int) $byCategory->sum('revenue')),
             'byCashier' => $this->byCashier(),
+            'byOutlet' => $this->byOutlet(),
+            'outletChoices' => $this->outletFilterChoices(),
             'hourlySales' => $this->hourlySales(),
             'peakHour' => $this->hourlySales()->firstWhere('is_peak', true),
             'topCustomers' => $this->topCustomers(),

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\CashMovementType;
 use App\Models\Concerns\Auditable;
+use App\Models\Concerns\BelongsToOutlet;
 use App\Models\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,9 +13,15 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 class CashMovement extends Model
 {
     use Auditable;
+    use BelongsToOutlet;
     use BelongsToTenant;
 
-    protected $fillable = ['cash_shift_id', 'user_id', 'type', 'amount', 'reason', 'reference_type', 'reference_id'];
+    protected static function limitsToAccessibleOutlets(): bool
+    {
+        return false;
+    }
+
+    protected $fillable = ['outlet_id', 'cash_shift_id', 'user_id', 'type', 'amount', 'reason', 'reference_type', 'reference_id'];
 
     /**
      * @return BelongsTo<CashShift, $this>

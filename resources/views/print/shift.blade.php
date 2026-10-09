@@ -6,6 +6,9 @@
 <x-layouts.thermal :title="'Rekap '.$shift->number" :width="$width">
     <div class="center">
         <div class="bold big">{{ \App\Support\Branding::companyName() }}</div>
+        @if ($identity['name'])
+            <div class="bold">{{ $identity['name'] }}</div>
+        @endif
         <div class="bold">REKAP SHIFT KASIR</div>
     </div>
 

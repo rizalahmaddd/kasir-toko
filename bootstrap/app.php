@@ -5,6 +5,7 @@ use App\Http\Middleware\EnsureFeatureEnabled;
 use App\Http\Middleware\EnsureProTenant;
 use App\Http\Middleware\EnsureStoreOnboarded;
 use App\Http\Middleware\EnsureTenantAccess;
+use App\Http\Middleware\IdentifyOutlet;
 use App\Http\Middleware\IdentifyTenant;
 use App\Http\Middleware\SecurityHeaders;
 use App\Services\Pos\PosException;
@@ -41,17 +42,20 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         $middleware->web(append: [
             IdentifyTenant::class,
+            IdentifyOutlet::class,
             EnsureTenantAccess::class,
             EnsureStoreOnboarded::class,
             EnsureFeatureEnabled::class,
         ]);
         $middleware->api(append: [
             IdentifyTenant::class.':sanctum',
+            IdentifyOutlet::class.':sanctum',
             EnsureTenantAccess::class.':sanctum',
         ]);
         // Route model binding must run with the tenant scope active; appended group middleware
         // otherwise runs after SubstituteBindings and {sale}/{product} resolve across shops.
         $middleware->prependToPriorityList(before: SubstituteBindings::class, prepend: IdentifyTenant::class);
+        $middleware->prependToPriorityList(before: SubstituteBindings::class, prepend: IdentifyOutlet::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
@@ -71,7 +75,7 @@ return Application::configure(basePath: dirname(__DIR__))
                     'errors' => ['message' => [$e->getMessage()]],
                     'reason' => $e->reason,
                     'context' => (object) $e->context,
-                ], 422);
+                ], $e->reason === 'outlet_locked' ? 423 : 422);
             }
         });
     })->create();

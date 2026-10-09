@@ -9,7 +9,10 @@ use App\Http\Requests\Api\V1\MasterData\ProductRequest;
 use App\Http\Resources\V1\MasterData\ProductResource;
 use App\Models\Product;
 use App\Services\DocumentNumberGenerator;
+use App\Services\OutletService;
 use App\Services\Pos\StockService;
+use App\Services\ProductCapabilityData;
+use App\Support\CurrentOutlet;
 use App\Support\CurrentTenant;
 use App\Support\OpenApi\Attributes\ApiQuery;
 use App\Support\OpenApi\Attributes\ApiResponse;
@@ -44,14 +47,15 @@ class ProductController extends Controller
         $sort = in_array($sort, self::SORTS, true) ? $sort : 'name';
 
         $records = Product::query()
-            ->with('category')
+            ->withOutletData()
+            ->with(['category', 'units', 'priceTiers', 'modifierGroups.modifiers', 'components.component'])
             ->search($request->query('search'))
             ->when($request->query('category_id') === 'none', fn (Builder $query) => $query->whereNull('category_id'))
             ->when(ctype_digit((string) $request->query('category_id')), fn (Builder $query) => $query->where('category_id', (int) $request->query('category_id')))
             ->when($request->query('status') === 'active', fn (Builder $query) => $query->where('is_active', true))
             ->when($request->query('status') === 'inactive', fn (Builder $query) => $query->where('is_active', false))
             ->when($request->query('status') === 'low', fn (Builder $query) => $query->lowStock())
-            ->orderBy($sort, str_starts_with((string) $request->query('sort'), '-') ? 'desc' : 'asc')
+            ->orderBy(['price' => 'outlet_price', 'stock' => 'outlet_stock'][$sort] ?? $sort, str_starts_with((string) $request->query('sort'), '-') ? 'desc' : 'asc')
             ->orderBy('id')
             ->paginate($this->perPage($request));
 
@@ -65,38 +69,49 @@ class ProductController extends Controller
     {
         Gate::authorize('view-master-data');
 
-        return new ProductResource($product->load('category'));
+        return new ProductResource($product->load(['category', 'outletPrices']));
     }
 
     /**
      * Tambah produk.
      *
-     * SKU kosong diisi otomatis (PRD-xxxxx). `stock` di sini menjadi stok awal dan tercatat di
-     * kartu stok.
+     * SKU kosong diisi otomatis (PRD-xxxxx). `stock` di sini menjadi stok awal di outlet yang
+     * sedang dipakai dan tercatat di kartu stok (dengan `batch_number`/`expires_at` untuk produk ber-batch).
+     * `units` mengganti seluruh daftar satuan jual (kirim `id` untuk satuan yang dipertahankan). `price` adalah harga bawaan semua outlet;
+     * `outlet_prices` mengisi (atau mengosongkan dengan `price` null) harga khusus tiap outlet.
      */
     #[ApiResponse(ProductResource::class, status: 201)]
-    public function store(ProductRequest $request, DocumentNumberGenerator $numbers, StockService $stock): ProductResource
+    public function store(ProductRequest $request, DocumentNumberGenerator $numbers, StockService $stock, OutletService $outlets, ProductCapabilityData $capabilityData): ProductResource
     {
         $data = $request->validated();
         PlanLimits::ensureCanAdd('products', 'name');
 
-        $product = DB::transaction(function () use ($data, $numbers, $stock, $request) {
-            $product = Product::create([
+        $product = DB::transaction(function () use ($data, $numbers, $stock, $outlets, $request, $capabilityData) {
+            $product = new Product([
                 ...$this->attributes($data),
                 'sku' => ($data['sku'] ?? null) ?: $numbers->next('PRD', 5),
                 'stock' => 0,
             ]);
+            $capabilityData->fill($product, $data);
+            $product->save();
+            $capabilityData->afterSave($product, $data);
 
             $initialStock = (float) ($data['stock'] ?? 0);
+            ProductCapabilityData::ensureInitialStockAllowed($product, $initialStock);
 
             if ($product->track_stock && $initialStock != 0.0) {
-                $stock->move($product, StockMovementType::Initial, $initialStock, $request->user(), null, 'Stok awal saat produk dibuat', $product->cost_price);
+                $stock->move($product, StockMovementType::Initial, $initialStock, $request->user(), null, 'Stok awal saat produk dibuat', $product->cost_price, null, [
+                    'number' => $data['batch_number'] ?? null,
+                    'expires_at' => $data['expires_at'] ?? null,
+                ]);
             }
+
+            $this->saveOutletPrices($product, $data, $outlets);
 
             return $product;
         });
 
-        return new ProductResource($product->load('category'));
+        return new ProductResource($product->load(['category', 'outletPrices']));
     }
 
     /**
@@ -104,16 +119,23 @@ class ProductController extends Controller
      *
      * `stock` diabaikan; pakai penyesuaian stok.
      */
-    public function update(ProductRequest $request, Product $product): ProductResource
+    public function update(ProductRequest $request, Product $product, OutletService $outlets, ProductCapabilityData $capabilityData): ProductResource
     {
         $data = $request->validated();
 
-        $product->update([
-            ...$this->attributes($data, $product),
-            'sku' => ($data['sku'] ?? null) ?: $product->sku,
-        ]);
+        DB::transaction(function () use ($product, $data, $outlets, $capabilityData) {
+            $product->fill([
+                ...$this->attributes($data, $product),
+                'sku' => ($data['sku'] ?? null) ?: $product->sku,
+            ]);
+            $capabilityData->fill($product, $data);
+            $product->save();
+            $capabilityData->afterSave($product, $data);
 
-        return new ProductResource($product->load('category'));
+            $this->saveOutletPrices($product, $data, $outlets);
+        });
+
+        return new ProductResource($product->load(['category', 'outletPrices']));
     }
 
     /**
@@ -158,6 +180,24 @@ class ProductController extends Controller
         }
 
         return new ProductResource($product->load('category'));
+    }
+
+    /**
+     * Harga khusus hanya untuk outlet yang boleh diakses akun ini; `price` null menghapusnya.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function saveOutletPrices(Product $product, array $data, OutletService $outlets): void
+    {
+        $current = app(CurrentOutlet::class);
+
+        foreach ($data['outlet_prices'] ?? [] as $row) {
+            if ($current->restrictedTo() !== null && ! $current->canAccess((int) $row['outlet_id'])) {
+                continue;
+            }
+
+            $outlets->setProductPrice($product->id, (int) $row['outlet_id'], isset($row['price']) ? (int) $row['price'] : null);
+        }
     }
 
     /**

@@ -17,7 +17,7 @@
                 @endif
             </div>
             <p class="text-xs text-slate-400 mt-1">
-                {{ $cashShift->user->name }} · dibuka {{ $cashShift->opened_at->translatedFormat('d M Y H:i') }}
+                {{ $cashShift->user->name }}@if (app(\App\Support\CurrentOutlet::class)->isMultiOutlet()) · {{ $cashShift->outlet?->name }}@endif · dibuka {{ $cashShift->opened_at->translatedFormat('d M Y H:i') }}
                 @if ($cashShift->closed_at)
                     · ditutup {{ $cashShift->closed_at->translatedFormat('d M Y H:i') }}{{ $cashShift->closer && $cashShift->closer->id !== $cashShift->user_id ? ' oleh '.$cashShift->closer->name : '' }}
                 @endif

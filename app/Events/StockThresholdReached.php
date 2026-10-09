@@ -17,6 +17,7 @@ class StockThresholdReached
         public Product $product,
         public float $currentStock,
         public float $minStock,
-        public bool $isOutOfStock = false
+        public bool $isOutOfStock = false,
+        public ?int $outletId = null,
     ) {}
 }

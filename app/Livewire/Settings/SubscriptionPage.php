@@ -8,6 +8,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Services\SumoPodPaymentService;
 use App\Support\CurrentTenant;
+use App\Support\PlanLimits;
 use App\Support\SaasPlans;
 use App\Support\SaasSettings;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -106,6 +107,7 @@ class SubscriptionPage extends Component
                 'max_users' => $freePlan['max_users'] ?? null,
                 'max_products' => $freePlan['max_products'] ?? null,
                 'features' => [
+                    self::outletFeature($freePlan),
                     'Kasir POS & Transaksi Penjualan',
                     'Cetak Struk Bluetooth Thermal',
                     'Shift Kasir & Buka/Tutup Laci Uang',
@@ -126,6 +128,7 @@ class SubscriptionPage extends Component
                 'max_products' => $proPlan['max_products'] ?? null,
                 'features' => [
                     'Semua fitur paket Gratis',
+                    self::outletFeature($proPlan, 'Hingga %d outlet dalam satu langganan'),
                     'Customer Display (Layar Pelanggan QRIS Dinamis)',
                     'Piutang & Catatan Kasbon Pelanggan',
                     'Laporan Penjualan & Analisis Laba Rugi',
@@ -146,6 +149,7 @@ class SubscriptionPage extends Component
                 'max_products' => $lifetimePlan['max_products'] ?? null,
                 'features' => [
                     'Semua fitur paket Pro selamanya',
+                    self::outletFeature($lifetimePlan, 'Hingga %d outlet tanpa biaya tambahan'),
                     'Sekali bayar tanpa tagihan perpanjangan',
                     'Akses permanen tanpa masa kedaluwarsa',
                     'Customer Display & Layar QRIS Dinamis',
@@ -154,6 +158,16 @@ class SubscriptionPage extends Component
                 ],
             ],
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $plan
+     */
+    private static function outletFeature(array $plan, string $multiple = 'Hingga %d outlet'): string
+    {
+        $max = (int) ($plan['max_outlets'] ?? 1);
+
+        return $max > 1 ? sprintf($multiple, $max) : '1 outlet';
     }
 
     #[Computed]
@@ -165,6 +179,8 @@ class SubscriptionPage extends Component
 
         $userCount = User::query()->count();
         $productCount = Product::query()->count();
+        $outletLimit = $tenant?->maxOutlets() ?? 1;
+        $outletCount = PlanLimits::count('outlets');
 
         return [
             'users' => [
@@ -176,6 +192,11 @@ class SubscriptionPage extends Component
                 'current' => $productCount,
                 'limit' => $productLimit,
                 'percent' => $productLimit ? min(100, (int) round(($productCount / $productLimit) * 100)) : null,
+            ],
+            'outlets' => [
+                'current' => $outletCount,
+                'limit' => $outletLimit,
+                'percent' => min(100, (int) round(($outletCount / $outletLimit) * 100)),
             ],
         ];
     }

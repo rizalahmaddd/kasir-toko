@@ -3,6 +3,7 @@
 namespace App\Livewire\Sales;
 
 use App\Livewire\Concerns\WithDataTable;
+use App\Livewire\Concerns\WithOutletFilter;
 use App\Models\CashShift;
 use App\Models\User;
 use App\Services\Pos\PosException;
@@ -18,7 +19,7 @@ use Livewire\Component;
 #[Title('Shift Kasir')]
 class ShiftIndex extends Component
 {
-    use WithDataTable;
+    use WithDataTable, WithOutletFilter;
 
     #[Url]
     public string $status = '';
@@ -30,7 +31,7 @@ class ShiftIndex extends Component
 
     public function updating(string $name): void
     {
-        if (in_array($name, ['status', 'cashier'], true)) {
+        if (in_array($name, ['status', 'cashier', 'outletFilter'], true)) {
             $this->resetPage();
         }
     }
@@ -68,7 +69,8 @@ class ShiftIndex extends Component
     public function render()
     {
         $shifts = CashShift::query()
-            ->with(['user', 'closer'])
+            ->with(['user', 'closer', 'outlet'])
+            ->forOutlet($this->outletFilterId())
             ->withCount(['sales as sales_count' => fn (Builder $query) => $query->completed()])
             ->withSum(['sales as sales_total' => fn (Builder $query) => $query->completed()], 'total')
             ->when(! $this->canManageAll(), fn (Builder $query) => $query->where('user_id', auth()->id()))
@@ -81,6 +83,7 @@ class ShiftIndex extends Component
 
         return view('livewire.sales.shift-index', [
             'shifts' => $shifts,
+            'outletChoices' => $this->outletFilterChoices(),
             'summary' => $this->myShift?->summary(),
             'cashiers' => $this->canManageAll() ? User::query()->whereIn('id', CashShift::query()->select('user_id'))->orderBy('name')->get(['id', 'name']) : collect(),
         ]);

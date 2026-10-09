@@ -4,6 +4,8 @@ namespace App\Livewire\Settings;
 
 use App\Enums\PaymentMethod;
 use App\Models\Setting;
+use App\Services\Pos\StockCountService;
+use App\Services\Pos\StockCountVariance;
 use App\Support\PosSettings;
 use App\Support\Qris;
 use Illuminate\Validation\Rule;
@@ -44,7 +46,31 @@ class PosSettingsPage extends Component
 
     public string $qrisPayload = '';
 
+    public bool $blockExpiredSale = true;
+
+    public string $expiryWarningDays = '30';
+
+    public string $prescriptionMode = 'strict';
+
+    public bool $allowControlledDrugs = false;
+
+    public string $serviceChargeRate = '0';
+
+    public bool $serviceChargeDineInOnly = true;
+
+    public string $photoRetentionYears = '0';
+
+    public string $nearExpiryPercent = '0';
+
+    public string $nearExpiryDays = '2';
+
     public string $qrisText = '';
+
+    public string $opnameReasonAbove = '0';
+
+    public string $opnameRecountPercent = '20';
+
+    public string $opnameAlertAbove = '0';
 
     /** @var TemporaryUploadedFile|null */
     public $qrisImage = null;
@@ -53,18 +79,32 @@ class PosSettingsPage extends Component
     {
         abort_unless(auth()->user()->can('settings.pos.manage'), 403);
 
-        $this->taxEnabled = PosSettings::get('pos.tax_enabled') === '1';
-        $this->taxRate = PosSettings::get('pos.tax_rate');
-        $this->taxLabel = PosSettings::get('pos.tax_label');
-        $this->allowNegativeStock = PosSettings::allowNegativeStock();
-        $this->allowCredit = PosSettings::allowCredit();
-        $this->paymentMethods = collect(PosSettings::paymentMethods())->map(fn (PaymentMethod $method) => $method->value)->all();
-        $this->receiptWidth = PosSettings::receiptWidth();
-        $this->receiptHeader = PosSettings::get('pos.receipt_header');
-        $this->receiptFooter = PosSettings::get('pos.receipt_footer');
-        $this->autoPrint = PosSettings::autoPrint();
-        $this->quickCash = implode(', ', PosSettings::quickCash());
-        $this->qrisPayload = PosSettings::get('pos.qris_payload');
+        // Halaman ini mengatur nilai toko; penimpaan per outlet diatur di halaman Outlet.
+        $this->taxEnabled = PosSettings::tenantValue('pos.tax_enabled') === '1';
+        $this->taxRate = PosSettings::tenantValue('pos.tax_rate');
+        $this->taxLabel = PosSettings::tenantValue('pos.tax_label');
+        $this->allowNegativeStock = PosSettings::tenantValue('pos.allow_negative_stock') === '1';
+        $this->allowCredit = PosSettings::tenantValue('pos.allow_credit') === '1';
+        $methods = json_decode(PosSettings::tenantValue('pos.payment_methods'), true);
+        $this->paymentMethods = array_values(array_filter(is_array($methods) ? $methods : [], fn ($method) => PaymentMethod::tryFrom((string) $method) !== null));
+        $this->receiptWidth = PosSettings::tenantValue('pos.receipt_width') === '80' ? '80' : '58';
+        $this->receiptHeader = PosSettings::tenantValue('pos.receipt_header');
+        $this->receiptFooter = PosSettings::tenantValue('pos.receipt_footer');
+        $this->autoPrint = PosSettings::tenantValue('pos.auto_print') === '1';
+        $this->quickCash = implode(', ', PosSettings::parseQuickCash(PosSettings::tenantValue('pos.quick_cash')));
+        $this->qrisPayload = PosSettings::tenantValue('pos.qris_payload');
+        $this->blockExpiredSale = PosSettings::tenantValue('pos.block_expired_sale') === '1';
+        $this->expiryWarningDays = (string) PosSettings::expiryWarningDays();
+        $this->prescriptionMode = PosSettings::tenantValue('pos.prescription_mode') === 'warn' ? 'warn' : 'strict';
+        $this->allowControlledDrugs = PosSettings::tenantValue('pos.allow_controlled_drugs') === '1';
+        $this->serviceChargeRate = PosSettings::tenantValue('pos.service_charge_rate');
+        $this->serviceChargeDineInOnly = PosSettings::tenantValue('pos.service_charge_dine_in_only') === '1';
+        $this->photoRetentionYears = (string) PosSettings::prescriptionPhotoRetentionYears();
+        $this->nearExpiryPercent = PosSettings::tenantValue('pos.near_expiry_discount_percent');
+        $this->nearExpiryDays = PosSettings::tenantValue('pos.near_expiry_discount_days');
+        $this->opnameReasonAbove = (string) (int) Setting::get(StockCountService::REASON_REQUIRED_ABOVE_KEY, '0');
+        $this->opnameRecountPercent = (string) (float) Setting::get(StockCountVariance::RECOUNT_PERCENT_KEY, '20');
+        $this->opnameAlertAbove = (string) (int) Setting::get(StockCountService::ALERT_ABOVE_KEY, '0');
     }
 
     public function updatedQrisImage(): void
@@ -125,6 +165,11 @@ class PosSettingsPage extends Component
         abort_unless(auth()->user()->can('settings.pos.manage'), 403);
 
         $this->taxRate = str_replace(',', '.', trim($this->taxRate));
+        $this->serviceChargeRate = str_replace(',', '.', trim($this->serviceChargeRate)) ?: '0';
+        $this->nearExpiryPercent = str_replace(',', '.', trim($this->nearExpiryPercent)) ?: '0';
+        $this->opnameReasonAbove = preg_replace('/\D/', '', $this->opnameReasonAbove) ?: '0';
+        $this->opnameAlertAbove = preg_replace('/\D/', '', $this->opnameAlertAbove) ?: '0';
+        $this->opnameRecountPercent = str_replace(',', '.', trim($this->opnameRecountPercent)) ?: '0';
         $validated = $this->validate([
             'taxEnabled' => ['boolean'],
             'taxRate' => ['required_if:taxEnabled,true', 'nullable', 'numeric', 'min:0', 'max:100'],
@@ -138,6 +183,18 @@ class PosSettingsPage extends Component
             'receiptFooter' => ['nullable', 'string', 'max:300'],
             'autoPrint' => ['boolean'],
             'quickCash' => ['nullable', 'string', 'max:200'],
+            'blockExpiredSale' => ['boolean'],
+            'expiryWarningDays' => ['required', 'integer', 'min:1', 'max:365'],
+            'prescriptionMode' => ['required', Rule::in(array_keys(PosSettings::PRESCRIPTION_MODES))],
+            'allowControlledDrugs' => ['boolean'],
+            'serviceChargeRate' => ['required', 'numeric', 'min:0', 'max:100'],
+            'serviceChargeDineInOnly' => ['boolean'],
+            'photoRetentionYears' => ['required', 'integer', 'min:0', 'max:30'],
+            'nearExpiryPercent' => ['required', 'numeric', 'min:0', 'max:90'],
+            'nearExpiryDays' => ['required', 'integer', 'min:0', 'max:60'],
+            'opnameReasonAbove' => ['required', 'integer', 'min:0', 'max:999999999999'],
+            'opnameRecountPercent' => ['required', 'numeric', 'min:0', 'max:1000'],
+            'opnameAlertAbove' => ['required', 'integer', 'min:0', 'max:999999999999'],
         ]);
 
         $quickCash = collect(preg_split('/[\s,;]+/', (string) $validated['quickCash']))
@@ -161,6 +218,18 @@ class PosSettingsPage extends Component
             'pos.auto_print' => $validated['autoPrint'] ? '1' : '0',
             'pos.quick_cash' => json_encode($quickCash->all()),
             'pos.qris_payload' => $this->qrisPayload !== '' && Qris::problem($this->qrisPayload) === null ? $this->qrisPayload : '',
+            'pos.block_expired_sale' => $validated['blockExpiredSale'] ? '1' : '0',
+            'pos.expiry_warning_days' => (string) $validated['expiryWarningDays'],
+            'pos.prescription_mode' => $validated['prescriptionMode'],
+            'pos.allow_controlled_drugs' => $validated['allowControlledDrugs'] ? '1' : '0',
+            'pos.service_charge_rate' => (string) (float) $validated['serviceChargeRate'],
+            'pos.service_charge_dine_in_only' => $validated['serviceChargeDineInOnly'] ? '1' : '0',
+            'pharmacy.photo_retention_years' => (string) (int) $validated['photoRetentionYears'],
+            'pos.near_expiry_discount_percent' => (string) (float) $validated['nearExpiryPercent'],
+            'pos.near_expiry_discount_days' => (string) (int) $validated['nearExpiryDays'],
+            StockCountService::REASON_REQUIRED_ABOVE_KEY => (string) (int) $validated['opnameReasonAbove'],
+            StockCountVariance::RECOUNT_PERCENT_KEY => (string) (float) $validated['opnameRecountPercent'],
+            StockCountService::ALERT_ABOVE_KEY => (string) (int) $validated['opnameAlertAbove'],
         ]);
 
         $this->quickCash = $quickCash->implode(', ');
@@ -180,7 +249,7 @@ class PosSettingsPage extends Component
         return view('livewire.settings.pos-settings', [
             'qrisMerchant' => $merchant,
             'qrisPreview' => $preview,
-            'qrisSaved' => $this->qrisPayload === PosSettings::get('pos.qris_payload'),
+            'qrisSaved' => $this->qrisPayload === PosSettings::tenantValue('pos.qris_payload'),
         ]);
     }
 }

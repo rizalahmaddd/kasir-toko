@@ -13,8 +13,10 @@ use Spatie\Permission\Models\Role;
  *
  * Setiap tautan boleh punya:
  * - feature: kunci Features yang harus menyala
+ * - per_outlet: true bila feature dibaca untuk outlet aktif (menu operasional), bukan level toko
  * - can: ability Gate, atau [ability, model] untuk policy
  * - superadmin: true bila hanya untuk Superadmin
+ * - multi_outlet: true bila hanya tampil di toko dengan lebih dari satu outlet
  * - mobile: true bila layak jadi tujuan di navigasi bawah mobile (maks. 4 yang lolos izin)
  */
 class Navigation
@@ -43,6 +45,9 @@ class Navigation
                         'children' => [
                             ['label' => 'Riwayat Transaksi', 'icon' => 'receipt', 'route' => 'sales.index', 'active' => 'sales.*', 'feature' => 'pos.sales', 'can' => 'pos.sell', 'mobile' => true, 'mobile_label' => 'Transaksi', 'keywords' => 'nota struk invoice batal void cetak ulang'],
                             ['label' => 'Shift Kasir', 'icon' => 'wallet', 'route' => 'shifts.index', 'active' => 'shifts.*', 'feature' => 'pos.shifts', 'can' => 'pos.sell', 'keywords' => 'buka tutup kasir laci setoran kas masuk keluar'],
+                            ['label' => 'Pesanan & Servis', 'icon' => 'clipboard-list', 'route' => 'orders.index', 'active' => 'orders.*', 'feature' => 'business.pre-order', 'per_outlet' => true, 'can' => 'orders.manage', 'keywords' => 'pesanan pre order dp uang muka kue servis service hp tanda terima'],
+                            ['label' => 'Layar Dapur', 'icon' => 'chef-hat', 'route' => 'kitchen.board', 'feature' => 'business.order-type', 'per_outlet' => true, 'can' => 'kitchen.view', 'keywords' => 'dapur kitchen tiket pesanan meja open bill masak barista'],
+                            ['label' => 'Resep', 'icon' => 'file-heart', 'route' => 'pharmacy.prescriptions', 'active' => 'pharmacy.*', 'feature' => 'business.prescription', 'per_outlet' => true, 'can' => 'pharmacy.prescription.view', 'keywords' => 'resep dokter apotek obat keras pasien copy resep etiket'],
                             ['label' => 'Piutang (Kasbon)', 'icon' => 'hand-coins', 'route' => 'receivables.index', 'active' => 'receivables.*', 'feature' => 'pos.receivables', 'can' => 'receivables.manage', 'pro' => true, 'keywords' => 'hutang kasbon tagihan pelunasan bon'],
                         ],
                     ],
@@ -57,8 +62,13 @@ class Navigation
                         'icon' => 'package',
                         'children' => [
                             ['label' => 'Produk', 'icon' => 'package', 'route' => 'master-data.products', 'active' => 'master-data.products*', 'feature' => 'master-data.products', 'can' => 'view-master-data', 'mobile' => true, 'keywords' => 'barang item harga barcode sku'],
+                            ['label' => 'Pilihan Tambahan', 'icon' => 'list-plus', 'route' => 'master-data.modifiers', 'feature' => 'business.modifiers', 'can' => 'view-master-data', 'keywords' => 'modifier varian topping ukuran level gula extra shot add-on'],
                             ['label' => 'Kategori', 'icon' => 'tags', 'route' => 'master-data.categories', 'active' => 'master-data.categories*', 'feature' => 'master-data.categories', 'can' => 'view-master-data', 'keywords' => 'kelompok jenis produk'],
-                            ['label' => 'Stok Barang', 'icon' => 'warehouse', 'route' => 'inventory.stock', 'active' => 'inventory.*', 'feature' => 'inventory.stock', 'can' => 'view-master-data', 'keywords' => 'stok masuk keluar opname gudang persediaan inventory'],
+                            ['label' => 'Stok Barang', 'icon' => 'warehouse', 'route' => 'inventory.stock', 'active' => 'inventory.stock', 'feature' => 'inventory.stock', 'can' => 'view-master-data', 'keywords' => 'stok masuk keluar opname gudang persediaan inventory'],
+                            ['label' => 'Stok Opname', 'icon' => 'clipboard-check', 'route' => 'inventory.opname', 'active' => 'inventory.opname*', 'feature' => 'inventory.opname', 'can' => 'inventory.opname.count', 'keywords' => 'opname hitung stok fisik audit gudang selisih'],
+                            ['label' => 'Stok Kedaluwarsa', 'icon' => 'calendar-x-2', 'route' => 'inventory.expiry', 'feature' => 'business.batch-expiry', 'can' => 'view-master-data', 'pro' => true, 'keywords' => 'kedaluwarsa expired ed batch basi rusak'],
+                            ['label' => 'Nomor Seri / IMEI', 'icon' => 'scan-barcode', 'route' => 'inventory.serials', 'feature' => 'business.serial-number', 'can' => 'view-master-data', 'keywords' => 'serial imei nomor seri garansi unit hp'],
+                            ['label' => 'Transfer Stok', 'icon' => 'arrow-left-right', 'route' => 'inventory.transfers', 'active' => 'inventory.transfers*', 'feature' => 'inventory.transfer', 'can' => 'inventory.transfer', 'multi_outlet' => true, 'keywords' => 'pindah stok antar outlet cabang kirim barang'],
                             ['label' => 'Pelanggan', 'icon' => 'users', 'route' => 'master-data.customers', 'active' => 'master-data.customers*', 'feature' => 'master-data.customers', 'can' => 'view-master-data', 'keywords' => 'customer klien kontak member'],
                         ],
                     ],
@@ -74,6 +84,7 @@ class Navigation
                         'feature' => 'reports',
                         'children' => [
                             ['label' => 'Laporan Penjualan', 'icon' => 'trending-up', 'route' => 'reports.sales', 'feature' => 'reports.sales', 'can' => 'reports.sales.view', 'pro' => true, 'keywords' => 'omzet laba profit terlaris rekap harian'],
+                            ['label' => 'Selisih Stok', 'icon' => 'clipboard-minus', 'route' => 'reports.stock-variance', 'feature' => 'reports.stock-variance', 'can' => 'reports.stock.view', 'pro' => true, 'keywords' => 'opname selisih stok hilang kurang lebih kehilangan'],
                             ['label' => 'Log Aktivitas', 'icon' => 'scroll-text', 'route' => 'reports.activity-log', 'feature' => 'reports.activity-log', 'can' => ['viewAny', Activity::class], 'pro' => true, 'keywords' => 'audit trail jejak riwayat login'],
                         ],
                     ],
@@ -84,6 +95,7 @@ class Navigation
                         'children' => [
                             ['label' => 'Profil Perusahaan', 'icon' => 'building-2', 'route' => 'settings.company-profile', 'feature' => 'settings.company-profile', 'can' => ['update', Setting::class], 'keywords' => 'profil perusahaan toko setting kop surat logo branding'],
                             ['label' => 'Pengaturan Kasir', 'icon' => 'sliders-horizontal', 'route' => 'settings.pos', 'feature' => 'settings.pos', 'can' => 'settings.pos.manage', 'keywords' => 'pajak ppn struk printer metode pembayaran qris kasbon stok minus'],
+                            ['label' => 'Outlet', 'icon' => 'store', 'route' => 'settings.outlets', 'feature' => 'settings.outlets', 'can' => 'outlets.view', 'keywords' => 'outlet cabang toko gerai lokasi akses pajak harga'],
                             ['label' => 'Layar Pelanggan', 'icon' => 'monitor-smartphone', 'route' => 'settings.customer-display', 'feature' => 'settings.customer-display', 'can' => 'settings.pos.manage', 'pro' => true, 'keywords' => 'customer display layar kedua monitor pembeli promo slideshow'],
                             ['label' => 'Peran & Perizinan', 'icon' => 'shield-alert', 'route' => 'settings.roles-and-permissions', 'active' => 'settings.roles-and-permissions*', 'feature' => 'settings.roles-and-permissions', 'can' => ['open', Role::class], 'keywords' => 'role permission peran perizinan hak akses user pengguna kasir'],
                             ['label' => 'Pengaturan Fitur', 'icon' => 'toggle-right', 'route' => 'settings.features', 'superadmin' => true, 'keywords' => 'fitur modul aktif nonaktif toggle'],
@@ -211,7 +223,11 @@ class Navigation
             return false;
         }
 
-        if (isset($link['feature']) && ! Features::enabled($link['feature'])) {
+        if (isset($link['feature']) && ! (($link['per_outlet'] ?? false) ? Features::enabledAt($link['feature']) : Features::enabled($link['feature']))) {
+            return false;
+        }
+
+        if (($link['multi_outlet'] ?? false) && ! app(CurrentOutlet::class)->isMultiOutlet()) {
             return false;
         }
 

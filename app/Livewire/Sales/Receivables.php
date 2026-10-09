@@ -4,6 +4,7 @@ namespace App\Livewire\Sales;
 
 use App\Enums\PaymentMethod;
 use App\Livewire\Concerns\WithDataTable;
+use App\Livewire\Concerns\WithOutletFilter;
 use App\Livewire\Concerns\WithRealtimeRefresh;
 use App\Models\Sale;
 use App\Services\Pos\PosException;
@@ -21,7 +22,7 @@ use Livewire\Component;
 #[Title('Piutang (Kasbon)')]
 class Receivables extends Component
 {
-    use WithDataTable, WithRealtimeRefresh;
+    use WithDataTable, WithOutletFilter, WithRealtimeRefresh;
 
     #[Url]
     public string $search = '';
@@ -39,6 +40,11 @@ class Receivables extends Component
         $this->resetPage();
     }
 
+    public function updatingOutletFilter(): void
+    {
+        $this->resetPage();
+    }
+
     /**
      * @return Builder<Sale>
      */
@@ -47,6 +53,7 @@ class Receivables extends Component
         $term = trim($this->search);
 
         return Sale::query()
+            ->forOutlet($this->outletFilterId())
             ->completed()
             ->where('due_amount', '>', 0)
             ->when($term !== '', fn (Builder $query) => $query->where(fn (Builder $query) => $query
@@ -112,8 +119,9 @@ class Receivables extends Component
 
         return view('livewire.sales.receivables', [
             'sales' => (clone $base)->with('customer')->orderBy('sold_at')->paginate($this->perPage),
-            'totalDue' => (int) Sale::query()->completed()->sum('due_amount'),
-            'customerCount' => Sale::query()->completed()->where('due_amount', '>', 0)->distinct()->count('customer_id'),
+            'totalDue' => (int) Sale::query()->forOutlet($this->outletFilterId())->completed()->sum('due_amount'),
+            'customerCount' => Sale::query()->forOutlet($this->outletFilterId())->completed()->where('due_amount', '>', 0)->distinct()->count('customer_id'),
+            'outletChoices' => $this->outletFilterChoices(),
             'collecting' => $this->collectingId ? Sale::with('customer')->find($this->collectingId) : null,
             'methods' => PosSettings::paymentMethods(),
         ]);

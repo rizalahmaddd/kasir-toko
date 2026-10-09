@@ -8,6 +8,7 @@ use App\Http\Resources\V1\Sales\SaleResource;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Sale;
+use App\Support\CurrentOutlet;
 use App\Support\Features;
 use App\Support\OpenApi\Attributes\ApiTag;
 use Illuminate\Http\Request;
@@ -21,12 +22,15 @@ class DashboardController extends Controller
      *
      * Hanya angka yang boleh dilihat akun ini dan fiturnya aktif yang dikirim; bagian yang tidak
      * boleh dilihat bernilai null. `target` menyebut daftar yang dibuka saat kartu diketuk.
-     * Penjualan hari ini milik sendiri untuk kasir, semua kasir untuk pemilik/admin.
+     * Penjualan hari ini milik sendiri untuk kasir, semua kasir untuk pemilik/admin. Angka untuk outlet
+     * yang sedang dipakai; `outlet_id` (id outlet atau `all`) butuh izin `reports.all-outlets`.
      */
     public function __invoke(Request $request): DashboardResource
     {
         $user = $request->user();
+        $outletId = $this->outletFilterId($request);
         $web = app('livewire')->new('dashboard');
+        $web->outletFilter = $outletId === null ? 'all' : (string) $outletId;
         $stats = [];
         $salesOn = Features::enabled('pos.cashier');
         $productsOn = Features::enabled('master-data.products');
@@ -44,7 +48,7 @@ class DashboardController extends Controller
             $stats[] = [
                 'key' => 'low_stock',
                 'label' => 'Stok menipis / habis',
-                'count' => Product::query()->where('is_active', true)->lowStock()->count(),
+                'count' => Product::query()->where('is_active', true)->lowStock($outletId ?? app(CurrentOutlet::class)->idOrPrimary())->count(),
                 'target' => ['endpoint' => '/api/v1/inventory/stock', 'query' => ['level' => 'low']],
             ];
         }
@@ -52,7 +56,7 @@ class DashboardController extends Controller
         $receivables = null;
 
         if ($salesOn && Features::enabled('pos.receivables') && $user->can('receivables.manage')) {
-            $unpaid = Sale::query()->completed()->where('due_amount', '>', 0);
+            $unpaid = Sale::query()->forOutlet($outletId)->completed()->where('due_amount', '>', 0);
             $receivables = ['total_due' => (int) (clone $unpaid)->sum('due_amount'), 'count' => (clone $unpaid)->count()];
             $stats[] = [
                 'key' => 'receivables_unpaid',

@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -39,6 +41,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_platform_admin' => 'boolean',
+            'all_outlets' => 'boolean',
         ];
     }
 
@@ -76,7 +79,7 @@ class User extends Authenticatable
      */
     public static function usernameRules(?self $ignore = null): array
     {
-        return ['required', 'string', 'min:3', 'max:30', 'regex:/^[a-z][a-z0-9._]*$/', Rule::unique(self::class)->ignore($ignore?->id)];
+        return ['required', 'string', 'min:3', 'max:30', 'regex:/^[a-z][a-z0-9._]*$/', Rule::unique(self::class, 'username')->ignore($ignore?->id)];
     }
 
     /**
@@ -86,7 +89,7 @@ class User extends Authenticatable
      */
     public static function phoneRules(?self $ignore = null): array
     {
-        return ['nullable', 'string', 'regex:/^0\d{8,14}$/', Rule::unique(self::class)->ignore($ignore?->id)];
+        return ['nullable', 'string', 'regex:/^0\d{8,14}$/', Rule::unique(self::class, 'phone')->ignore($ignore?->id)];
     }
 
     /**
@@ -116,6 +119,31 @@ class User extends Authenticatable
     public function isPlatformAdmin(): bool
     {
         return $this->tenant_id === null && $this->is_platform_admin;
+    }
+
+    /**
+     * Pemilik dan user bertanda "semua outlet" memakai seluruh outlet; selain itu hanya yang ditugaskan.
+     * Pemilik selalu dianggap semua outlet supaya tidak bisa mengunci dirinya sendiri.
+     */
+    public function hasAllOutletAccess(): bool
+    {
+        return $this->all_outlets || $this->isSuperAdmin();
+    }
+
+    /**
+     * @return BelongsToMany<Outlet, $this>
+     */
+    public function outlets(): BelongsToMany
+    {
+        return $this->belongsToMany(Outlet::class, 'outlet_user');
+    }
+
+    /**
+     * @return BelongsTo<Outlet, $this>
+     */
+    public function defaultOutlet(): BelongsTo
+    {
+        return $this->belongsTo(Outlet::class, 'default_outlet_id');
     }
 
     /**

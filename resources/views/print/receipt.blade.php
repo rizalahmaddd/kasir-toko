@@ -13,11 +13,14 @@
             <img src="{{ $logo }}" alt="" class="logo">
         @endif
         <div class="bold big">{{ \App\Support\Branding::companyName() }}</div>
-        @if (Setting::get('company_address'))
-            <div class="muted">{{ Setting::get('company_address') }}</div>
+        @if ($identity['name'])
+            <div class="bold">{{ $identity['name'] }}</div>
         @endif
-        @if (Setting::get('company_phone'))
-            <div class="muted">Telp {{ Setting::get('company_phone') }}</div>
+        @if ($identity['address'])
+            <div class="muted">{{ $identity['address'] }}</div>
+        @endif
+        @if ($identity['phone'])
+            <div class="muted">Telp {{ $identity['phone'] }}</div>
         @endif
         @if ($header)
             <div class="muted" style="white-space: pre-line">{{ $header }}</div>
@@ -31,6 +34,9 @@
     @if ($sale->customer)
         <div class="row"><span>Pelanggan</span><span>{{ $sale->customer->name }}</span></div>
     @endif
+    @if ($sale->orderType())
+        <div class="row"><span>Pesanan</span><span>{{ $sale->orderType()->shortLabel() }}{{ $sale->orderLabel() ? ' · '.$sale->orderLabel() : '' }}</span></div>
+    @endif
 
     @if ($sale->isVoided())
         <div class="center"><span class="stamp">DIBATALKAN</span></div>
@@ -41,12 +47,24 @@
         <div class="item">
             <div>{{ $item->product_name }}</div>
             <div class="row">
-                <span>{{ Num::quantity($item->quantity) }} x {{ number_format($item->price, 0, ',', '.') }}</span>
+                <span>{{ Num::quantity($item->quantity) }}{{ $item->product_unit_id ? ' '.$item->unit : '' }} x {{ number_format($item->price, 0, ',', '.') }}</span>
                 <span>{{ number_format($item->total + $item->discount_amount, 0, ',', '.') }}</span>
             </div>
-            @if ($item->discount_amount > 0)
-                <div class="row"><span>&nbsp; Diskon</span><span>-{{ number_format($item->discount_amount, 0, ',', '.') }}</span></div>
+            @if ($item->serials->isNotEmpty())
+                <div class="muted">&nbsp; SN: {{ $item->serials->pluck('serial')->implode(', ') }}</div>
+                @if ($item->product?->warranty_days)
+                    <div class="muted">&nbsp; Garansi s/d {{ $sale->sold_at->copy()->addDays($item->product->warranty_days)->format('d/m/Y') }}</div>
+                @endif
             @endif
+            @foreach ($item->modifiers ?? [] as $modifier)
+                <div class="row muted"><span>&nbsp; + {{ $modifier['name'] ?? '' }}</span><span>{{ ($modifier['price'] ?? 0) > 0 ? number_format($modifier['price'], 0, ',', '.') : '' }}</span></div>
+            @endforeach
+            @if ($item->discount_amount > 0)
+                <div class="row"><span>&nbsp; {{ $item->auto_discount > 0 && $item->auto_discount >= $item->discount_amount ? 'Diskon ED' : 'Diskon' }}</span><span>-{{ number_format($item->discount_amount, 0, ',', '.') }}</span></div>
+            @endif
+            @foreach (\App\Support\ProductAttributes::receiptLines($item->product?->custom_attributes) as $attributeLine)
+                <div class="muted">&nbsp; {{ $attributeLine }}</div>
+            @endforeach
             @if ($item->note)
                 <div class="muted">&nbsp; {{ $item->note }}</div>
             @endif
@@ -61,12 +79,18 @@
             <span>-{{ number_format($sale->discount_amount, 0, ',', '.') }}</span>
         </div>
     @endif
+    @if ($sale->service_charge_amount > 0)
+        <div class="row"><span>Service {{ Num::quantity($sale->service_charge_rate) }}%</span><span>{{ number_format($sale->service_charge_amount, 0, ',', '.') }}</span></div>
+    @endif
     @if ($sale->tax_amount > 0)
         <div class="row"><span>{{ PosSettings::taxLabel() }} {{ Num::quantity($sale->tax_rate) }}%</span><span>{{ number_format($sale->tax_amount, 0, ',', '.') }}</span></div>
     @endif
     <div class="row bold big"><span>TOTAL</span><span>{{ Num::currency($sale->total) }}</span></div>
 
     <hr class="sep">
+    @foreach ($sale->payments->where('kind', 'deposit') as $payment)
+        <div class="row"><span>DP {{ $payment->reference }}</span><span>{{ number_format($payment->amount, 0, ',', '.') }}</span></div>
+    @endforeach
     @foreach ($sale->payments->where('kind', 'sale') as $payment)
         <div class="row">
             <span>{{ $payment->method->label() }}</span>

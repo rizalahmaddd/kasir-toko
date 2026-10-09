@@ -53,15 +53,71 @@ class PermissionSeeder extends Seeder
                 'label' => 'Kelola Stok',
                 'description' => 'Mencatat stok masuk, stok keluar, dan stok opname.',
             ],
+            'inventory.transfer' => [
+                'label' => 'Transfer Stok Antar Outlet',
+                'description' => 'Memindahkan stok dari satu outlet ke outlet lain dan membatalkan transfer.',
+            ],
+            'inventory.opname.count' => [
+                'label' => 'Hitung Stok Opname',
+                'description' => 'Membuka opname yang sedang berjalan dan mengisi hasil hitung.',
+            ],
+            'inventory.opname.manage' => [
+                'label' => 'Kelola Stok Opname',
+                'description' => 'Memulai, memeriksa, menyelesaikan, dan membatalkan opname; melihat stok sistem walau disembunyikan dari penghitung.',
+            ],
+        ],
+        'Outlet' => [
+            'outlets.view' => [
+                'label' => 'Lihat Daftar Outlet',
+                'description' => 'Melihat semua outlet toko beserta statusnya.',
+            ],
+            'outlets.manage' => [
+                'label' => 'Kelola Outlet',
+                'description' => 'Menambah, mengubah, menonaktifkan outlet, mengatur akses pengguna, pajak, harga, dan metode bayar per outlet.',
+            ],
+        ],
+        'Farmasi' => [
+            'pharmacy.prescription.view' => [
+                'label' => 'Lihat Resep & Data Pasien',
+                'description' => 'Melihat daftar resep, data pasien, foto resep, dan laporan obat keras.',
+            ],
+            'pharmacy.prescription.manage' => [
+                'label' => 'Input Resep',
+                'description' => 'Mencatat resep baru dan menautkannya ke transaksi di kasir.',
+            ],
+            'pharmacy.prescription.verify' => [
+                'label' => 'Verifikasi Resep (Apoteker)',
+                'description' => 'Memverifikasi resep sehingga obat keras bisa diserahkan.',
+            ],
+        ],
+        'Pesanan' => [
+            'orders.manage' => [
+                'label' => 'Kelola Pesanan & Servis',
+                'description' => 'Mencatat pesanan/tiket servis, menerima uang muka, mengubah status, dan membatalkan pesanan.',
+            ],
+        ],
+        'Dapur' => [
+            'kitchen.view' => [
+                'label' => 'Layar Dapur',
+                'description' => 'Melihat tiket dapur pesanan yang masuk dan menandainya selesai.',
+            ],
         ],
         'Laporan & Audit' => [
             'reports.sales.view' => [
                 'label' => 'Laporan Penjualan',
                 'description' => 'Melihat omzet, laba kotor, produk terlaris, dan rekap metode pembayaran.',
             ],
+            'reports.stock.view' => [
+                'label' => 'Laporan Selisih Stok',
+                'description' => 'Melihat selisih stok hasil opname per periode, outlet, kategori, dan alasan, beserta nilainya.',
+            ],
             'reports.activity.view' => [
                 'label' => 'Log Aktivitas (Audit Trail)',
                 'description' => 'Melihat seluruh jejak audit aktivitas pengguna sistem.',
+            ],
+            'reports.all-outlets' => [
+                'label' => 'Laporan Semua Outlet',
+                'description' => 'Melihat data gabungan dan data outlet lain di dashboard dan laporan.',
             ],
         ],
         'Pengaturan & Keamanan' => [
@@ -93,17 +149,23 @@ class PermissionSeeder extends Seeder
         'superadmin' => ['*'],
         'admin' => [
             'pos.sell', 'pos.discount', 'pos.void', 'sales.view', 'shifts.manage', 'receivables.manage',
-            'master-data.view', 'master-data.manage', 'inventory.manage',
-            'reports.sales.view', 'reports.activity.view',
+            'master-data.view', 'master-data.manage', 'inventory.manage', 'inventory.transfer',
+            'inventory.opname.count', 'inventory.opname.manage',
+            'outlets.view', 'reports.all-outlets',
+            'reports.sales.view', 'reports.stock.view', 'reports.activity.view',
             'settings.company.manage', 'settings.pos.manage',
             'users.manage',
+            'pharmacy.prescription.view', 'pharmacy.prescription.manage',
+            'kitchen.view', 'orders.manage',
         ],
         'kasir' => [
             'pos.sell', 'receivables.manage',
             'master-data.view',
+            'pharmacy.prescription.view', 'pharmacy.prescription.manage',
+            'kitchen.view', 'orders.manage',
         ],
         'staff' => [
-            'master-data.view', 'inventory.manage',
+            'master-data.view', 'inventory.manage', 'inventory.transfer', 'inventory.opname.count',
         ],
     ];
 

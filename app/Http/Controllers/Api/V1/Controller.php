@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller as BaseController;
+use App\Support\CurrentOutlet;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -73,6 +75,30 @@ abstract class Controller extends BaseController
 
             throw ValidationException::withMessages(['message' => __('Aksi ini tidak bisa dilakukan pada status :status.', ['status' => $label])]);
         }
+    }
+
+    /**
+     * Outlet yang dipakai untuk menyaring daftar dan laporan: query `outlet_id` (id outlet atau `all`),
+     * bawaannya outlet aktif dari header X-Outlet-Id. Null berarti semua outlet. Memilih outlet lain
+     * atau `all` butuh izin `reports.all-outlets`.
+     */
+    protected function outletFilterId(Request $request): ?int
+    {
+        $current = app(CurrentOutlet::class);
+        $param = (string) $request->query('outlet_id', '');
+
+        if ($param === '' || (ctype_digit($param) && (int) $param === $current->id())) {
+            return $current->idOrPrimary();
+        }
+
+        $allowed = $request->user()->can('reports.all-outlets')
+            && ($param === 'all' || (ctype_digit($param) && ($current->restrictedTo() === null || $current->canAccess((int) $param))));
+
+        if (! $allowed) {
+            throw new HttpResponseException(response()->json(['message' => __('Anda tidak boleh melihat data outlet ini.'), 'reason' => 'outlet_forbidden'], 403));
+        }
+
+        return $param === 'all' ? null : (int) $param;
     }
 
     protected function created(JsonResource $resource): JsonResponse

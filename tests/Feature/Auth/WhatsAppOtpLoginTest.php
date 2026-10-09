@@ -4,12 +4,15 @@ use App\Models\User;
 use App\Services\FonnteService;
 use App\Services\WhatsAppOtpService;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Volt\Volt;
 
+beforeEach(fn () => Config::set('services.fonnte.token', 'test-token'));
+
 test('whatsapp login tab can be rendered when fonnte token is configured', function () {
-    \Illuminate\Support\Facades\Config::set('services.fonnte.token', 'test-token');
+    Config::set('services.fonnte.token', 'test-token');
 
     $response = $this->get('/login');
 
@@ -20,7 +23,7 @@ test('whatsapp login tab can be rendered when fonnte token is configured', funct
 });
 
 test('whatsapp login tab is hidden when fonnte token is not configured', function () {
-    \Illuminate\Support\Facades\Config::set('services.fonnte.token', null);
+    Config::set('services.fonnte.token', null);
 
     $response = $this->get('/login');
 

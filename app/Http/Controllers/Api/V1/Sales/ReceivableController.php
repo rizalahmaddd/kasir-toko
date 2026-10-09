@@ -27,26 +27,30 @@ class ReceivableController extends Controller
      */
     #[ApiQuery('search', description: 'No. transaksi atau nama/HP pelanggan.')]
     #[ApiQuery('customer_id', 'integer', 'Kasbon satu pelanggan.')]
+    #[ApiQuery('outlet_id', description: 'Id outlet asal transaksi atau `all`. Default outlet aktif; outlet lain dan `all` butuh izin `reports.all-outlets`.')]
     #[ApiResponse(SaleResource::class, paginated: true)]
     public function index(Request $request): AnonymousResourceCollection
     {
         $term = trim((string) $request->query('search'));
 
+        $outletId = $this->outletFilterId($request);
+
         $sales = Sale::query()
+            ->forOutlet($outletId)
             ->completed()
             ->where('due_amount', '>', 0)
             ->when($request->integer('customer_id'), fn (Builder $query) => $query->where('customer_id', $request->integer('customer_id')))
             ->when($term !== '', fn (Builder $query) => $query->where(fn (Builder $query) => $query
                 ->where('number', 'like', "%{$term}%")
                 ->orWhereHas('customer', fn (Builder $query) => $query->where('name', 'like', "%{$term}%")->orWhere('phone', 'like', "%{$term}%"))))
-            ->with(['customer', 'cashier', 'payments'])
+            ->with(['customer', 'cashier', 'payments', 'outlet'])
             ->withCount('items')
             ->orderBy('sold_at')
             ->paginate($this->perPage($request));
 
         return SaleResource::collection($sales)->additional(['meta' => [
-            'total_due' => (int) Sale::query()->completed()->sum('due_amount'),
-            'customer_count' => Sale::query()->completed()->where('due_amount', '>', 0)->distinct()->count('customer_id'),
+            'total_due' => (int) Sale::query()->forOutlet($outletId)->completed()->sum('due_amount'),
+            'customer_count' => Sale::query()->forOutlet($outletId)->completed()->where('due_amount', '>', 0)->distinct()->count('customer_id'),
         ]]);
     }
 

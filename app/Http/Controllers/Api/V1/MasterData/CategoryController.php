@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\Controller;
 use App\Http\Requests\Api\V1\MasterData\CategoryRequest;
 use App\Http\Resources\V1\MasterData\CategoryResource;
 use App\Models\Category;
+use App\Support\CurrentOutlet;
 use App\Support\OpenApi\Attributes\ApiQuery;
 use App\Support\OpenApi\Attributes\ApiResponse;
 use App\Support\OpenApi\Attributes\ApiTag;
@@ -30,6 +31,7 @@ class CategoryController extends Controller
         Gate::authorize('view-master-data');
 
         $records = Category::query()
+            ->with('outlets')
             ->withCount('products')
             ->when($request->has('is_active'), fn ($query) => $query->where('is_active', $request->boolean('is_active')))
             ->when($request->filled('search'), fn ($query) => $query->where('name', 'like', "%{$request->search}%"))
@@ -47,7 +49,7 @@ class CategoryController extends Controller
     {
         Gate::authorize('view-master-data');
 
-        return new CategoryResource($category->loadCount('products'));
+        return new CategoryResource($category->loadCount('products')->load('outlets'));
     }
 
     /**
@@ -56,7 +58,10 @@ class CategoryController extends Controller
     #[ApiResponse(CategoryResource::class, status: 201)]
     public function store(CategoryRequest $request): CategoryResource
     {
-        return new CategoryResource(Category::create($request->validated()));
+        $category = Category::create($request->safe()->except('outlet_ids'));
+        $category->restrictToOutletsWithin(array_map('intval', $request->validated('outlet_ids', [])), app(CurrentOutlet::class)->restrictedTo());
+
+        return new CategoryResource($category->load('outlets'));
     }
 
     /**
@@ -64,9 +69,13 @@ class CategoryController extends Controller
      */
     public function update(CategoryRequest $request, Category $category): CategoryResource
     {
-        $category->update($request->validated());
+        $category->update($request->safe()->except('outlet_ids'));
 
-        return new CategoryResource($category);
+        if ($request->has('outlet_ids')) {
+            $category->restrictToOutletsWithin(array_map('intval', $request->validated('outlet_ids')), app(CurrentOutlet::class)->restrictedTo());
+        }
+
+        return new CategoryResource($category->load('outlets'));
     }
 
     /**
