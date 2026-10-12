@@ -20,25 +20,36 @@
             </div>
         @else
             <section class="rounded-2xl p-6 sm:p-10 bg-gradient-to-br from-slate-900 to-slate-800 border border-slate-800 shadow-lg text-slate-100 no-dark-invert">
-                <div class="flex flex-col sm:flex-row sm:items-center gap-6">
-                    <x-brand-mark size="w-14 h-14" padding="p-3" radius="rounded-2xl" class="shrink-0" />
-                    <div class="flex-1 min-w-0 space-y-1.5">
-                        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-                            {{ \App\Support\Branding::appName() }} untuk Android
-                        </h1>
-                        <p class="text-sm text-slate-300">
-                            Versi {{ $release['version'] }}@if ($release['build']) (build {{ $release['build'] }})@endif
-                            · dirilis {{ \Illuminate\Support\Carbon::parse($release['published_at'])->timezone(config('app.timezone'))->translatedFormat('j F Y') }}
-                        </p>
-                    </div>
-                </div>
+                <div class="flex items-center gap-8">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex flex-col sm:flex-row sm:items-center gap-6">
+                            <x-brand-mark size="w-14 h-14" padding="p-3" radius="rounded-2xl" class="shrink-0" />
+                            <div class="flex-1 min-w-0 space-y-1.5">
+                                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-100">
+                                    {{ \App\Support\Branding::appName() }} untuk Android
+                                </h1>
+                                <p class="text-sm text-slate-300">
+                                    Versi {{ $release['version'] }}@if ($release['build']) (build {{ $release['build'] }})@endif
+                                    · dirilis {{ \Illuminate\Support\Carbon::parse($release['published_at'])->timezone(config('app.timezone'))->translatedFormat('j F Y') }}
+                                </p>
+                            </div>
+                        </div>
 
-                <div class="mt-6 flex flex-col sm:flex-row sm:items-center gap-3">
-                    <x-primary-button size="sm" :href="route('app.download.apk', $primary['abi'])" download>
-                        <i data-lucide="download" class="w-4 h-4"></i>
-                        <span>Unduh APK ({{ Number::fileSize($primary['size'], precision: 1) }})</span>
-                    </x-primary-button>
-                    <span class="text-xs text-slate-400">{{ $abiLabels[$primary['abi']]['title'] ?? $primary['abi'] }}</span>
+                        <div class="mt-6 flex flex-col sm:flex-row sm:items-center gap-3">
+                            <x-primary-button size="sm" :href="route('app.download.apk', $primary['abi'])" download>
+                                <i data-lucide="download" class="w-4 h-4"></i>
+                                <span>Unduh APK ({{ Number::fileSize($primary['size'], precision: 1) }})</span>
+                            </x-primary-button>
+                            <span class="text-xs text-slate-400">{{ $abiLabels[$primary['abi']]['title'] ?? $primary['abi'] }}</span>
+                        </div>
+                    </div>
+
+                    <figure class="hidden lg:flex flex-col items-center gap-2 shrink-0">
+                        <div class="w-36 h-36 bg-white rounded-xl p-2 shadow-sm [&>svg]:w-full [&>svg]:h-full" role="img" aria-label="QR code halaman unduh aplikasi">
+                            {!! \App\Support\QrCodeSvg::render(route('app.download')) !!}
+                        </div>
+                        <figcaption class="text-xs text-slate-400 text-center">Scan dari HP Android<br>untuk membuka halaman ini</figcaption>
+                    </figure>
                 </div>
 
                 @if ($release['notes'])
@@ -52,20 +63,20 @@
             <section class="bg-white dark:bg-slate-900 rounded-xl p-6 sm:p-8 border border-slate-200 dark:border-slate-800">
                 <h2 class="text-lg font-bold text-slate-900 dark:text-white">Panduan Pemasangan Cepat</h2>
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
-                    <div class="p-3.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 space-y-1.5">
+                    <div class="p-3.5 rounded-xl border border-slate-800 bg-slate-950/40 space-y-1.5">
                         <span class="w-6 h-6 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center justify-center">1</span>
-                        <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100">Unduh APK</h3>
-                        <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">Ketuk tombol unduh di atas dari browser ponsel Android Anda.</p>
+                        <h3 class="text-xs font-bold text-slate-100">Unduh APK</h3>
+                        <p class="text-[11px] text-slate-400 leading-relaxed">Ketuk tombol unduh di atas dari browser ponsel Android Anda.</p>
                     </div>
-                    <div class="p-3.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 space-y-1.5">
+                    <div class="p-3.5 rounded-xl border border-slate-800 bg-slate-950/40 space-y-1.5">
                         <span class="w-6 h-6 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center justify-center">2</span>
-                        <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100">Izinkan Pemasangan</h3>
-                        <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">Buka file dari notifikasi unduhan, lalu izinkan instal dari sumber ini jika diminta.</p>
+                        <h3 class="text-xs font-bold text-slate-100">Izinkan Pemasangan</h3>
+                        <p class="text-[11px] text-slate-400 leading-relaxed">Buka file dari notifikasi unduhan, lalu izinkan instal dari sumber ini jika diminta.</p>
                     </div>
-                    <div class="p-3.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 space-y-1.5">
+                    <div class="p-3.5 rounded-xl border border-slate-800 bg-slate-950/40 space-y-1.5">
                         <span class="w-6 h-6 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center justify-center">3</span>
-                        <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100">Buka &amp; Masuk</h3>
-                        <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">Buka aplikasi kasir dan masuk dengan akun toko Anda yang sama.</p>
+                        <h3 class="text-xs font-bold text-slate-100">Buka &amp; Masuk</h3>
+                        <p class="text-[11px] text-slate-400 leading-relaxed">Buka aplikasi kasir dan masuk dengan akun toko Anda yang sama.</p>
                     </div>
                 </div>
                 <p class="mt-4 text-xs text-slate-500 dark:text-slate-400">

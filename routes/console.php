@@ -2,6 +2,7 @@
 
 use App\Jobs\CreateBackup;
 use App\Models\BackupSchedule;
+use App\Services\Pos\SelfOrderService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -47,3 +48,6 @@ Schedule::command('pharmacy:prune-prescription-photos')->dailyAt('04:00')->name(
 
 // Stok opname: ingatkan dokumen yang dibiarkan terbuka, karena hitungan basi dan bisa menahan stok masuk/keluar.
 Schedule::command('stock:remind-open-counts')->dailyAt('08:30')->name('remind-open-stock-counts');
+
+// Pesanan QR yang tidak ditanggapi kasir sampai batas waktu outletnya dibatalkan dan pelanggannya diberi tahu.
+Schedule::call(fn () => app(SelfOrderService::class)->expireStale())->everyMinute()->name('expire-stale-self-orders')->withoutOverlapping();

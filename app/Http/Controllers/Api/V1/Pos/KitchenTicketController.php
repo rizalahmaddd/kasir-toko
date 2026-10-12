@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Pos;
 use App\Http\Controllers\Api\V1\Controller;
 use App\Http\Resources\V1\Pos\KitchenTicketResource;
 use App\Models\KitchenTicket;
+use App\Services\Pos\KitchenTicketService;
 use App\Support\CurrentOutlet;
 use App\Support\OpenApi\Attributes\ApiQuery;
 use App\Support\OpenApi\Attributes\ApiResponse;
@@ -15,6 +16,8 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 #[ApiTag('Tiket Dapur', 'Kasir & Penjualan', 'Tiket pesanan untuk dapur di outlet aktif. Aktif bila kapabilitas `business.order-type` menyala.')]
 class KitchenTicketController extends Controller
 {
+    public function __construct(private KitchenTicketService $kitchen) {}
+
     /**
      * Daftar tiket dapur.
      *
@@ -55,9 +58,7 @@ class KitchenTicketController extends Controller
     {
         abort_unless($request->user()->can('kitchen.view'), 403);
 
-        if (! $ticket->isDone()) {
-            $ticket->update(['status' => KitchenTicket::STATUS_DONE, 'done_at' => now()]);
-        }
+        $this->kitchen->markDone($ticket);
 
         return new KitchenTicketResource($ticket->load('sale', 'user'));
     }
@@ -69,7 +70,7 @@ class KitchenTicketController extends Controller
     {
         abort_unless($request->user()->can('kitchen.view'), 403);
 
-        $ticket->update(['status' => KitchenTicket::STATUS_PENDING, 'done_at' => null]);
+        $this->kitchen->reopen($ticket);
 
         return new KitchenTicketResource($ticket->load('sale', 'user'));
     }

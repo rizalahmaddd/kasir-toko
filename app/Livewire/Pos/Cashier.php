@@ -9,19 +9,23 @@ use App\Models\Category;
 use App\Models\Customer;
 use App\Models\CustomerOrder;
 use App\Models\HeldOrder;
+use App\Models\KitchenTicket;
 use App\Models\Outlet;
 use App\Models\Prescription;
 use App\Models\Product;
 use App\Models\ProductSerial;
 use App\Models\ProductUnit;
+use App\Models\SelfOrder;
 use App\Services\DocumentNumberGenerator;
 use App\Services\Pos\BatchService;
 use App\Services\Pos\CustomerOrderService;
 use App\Services\Pos\HeldOrderService;
 use App\Services\Pos\ModifierService;
 use App\Services\Pos\PosException;
+use App\Services\Pos\SelfOrderService;
 use App\Services\Pos\ShiftService;
 use App\Support\CurrentOutlet;
+use App\Support\CurrentTenant;
 use App\Support\CustomerDisplaySettings;
 use App\Support\Features;
 use App\Support\PosSettings;
@@ -536,6 +540,174 @@ class Cashier extends Component
         ];
     }
 
+    private function selfOrdersEnabled(): bool
+    {
+        return Features::enabledAt('business.self-order') && (app(CurrentTenant::class)->get()?->isPro() ?? true);
+    }
+
+    /**
+     * Sinyal realtime outlet diteruskan ke Alpine; kotak masuknya dipegang pos.js supaya katalog tidak dirender ulang.
+     *
+     * @return array<string, string>
+     */
+    public function getListeners(): array
+    {
+        $channel = app(CurrentOutlet::class)->channel();
+
+        if ($channel === null || ! $this->selfOrdersEnabled()) {
+            return [];
+        }
+
+        return [
+            "echo-private:{$channel},.self-order.changed" => 'selfOrderChanged',
+            "echo-private:{$channel},.self-order.ready" => 'selfOrderReady',
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $event
+     */
+    #[Renderless]
+    public function selfOrderChanged(array $event = []): void
+    {
+        $this->dispatch('pos-self-order', kind: ($event['new'] ?? false) ? 'new' : 'changed', label: (string) ($event['label'] ?? ''));
+    }
+
+    /**
+     * @param  array<string, mixed>  $event
+     */
+    #[Renderless]
+    public function selfOrderReady(array $event = []): void
+    {
+        $this->dispatch('pos-self-order', kind: 'ready', label: (string) ($event['label'] ?? ''), customer: (string) ($event['customer'] ?? ''));
+    }
+
+    /**
+     * Pesanan QR yang masih terbuka di outlet aktif, terlama dulu.
+     *
+     * @return list<array<string, mixed>>
+     */
+    #[Renderless]
+    public function selfOrders(SelfOrderService $selfOrders): array
+    {
+        if (! $this->selfOrdersEnabled()) {
+            return [];
+        }
+
+        return SelfOrder::query()->forOutlet(app(CurrentOutlet::class)->id())->open()->with('items')->oldest()->limit(100)->get()
+            ->map(fn (SelfOrder $order) => [
+                'id' => $order->id,
+                'number' => $order->number,
+                'label' => $order->label(),
+                'queue_number' => $order->queue_number,
+                'customer' => $order->customer_name,
+                'phone' => $order->customer_phone,
+                'status' => $order->status,
+                'status_label' => $order->statusLabel(),
+                'payment_method' => $order->payment_method,
+                'payment_status' => $order->payment_status,
+                'payment_label' => $order->paymentLabel(),
+                'total' => $order->total,
+                'notes' => $order->notes,
+                'created' => $order->created_at->diffForHumans(),
+                'action' => $selfOrders->nextAction($order),
+                'held_order_id' => $order->isPaid() ? null : $order->held_order_id,
+                'items' => $order->items->map(fn ($item) => [
+                    'name' => $item->product_name,
+                    'quantity' => $item->quantity,
+                    'modifiers' => collect($item->modifiers ?? [])->pluck('name')->filter()->implode(', '),
+                    'note' => $item->note,
+                ])->all(),
+            ])
+            ->all();
+    }
+
+    /**
+     * Aksi kotak masuk: accept, verify, reject_payment, bill, cancel, served.
+     *
+     * @return array{ok: bool, message: string, ticket_urls?: list<string>, receipt_url?: string}
+     */
+    #[Renderless]
+    public function selfOrderAction(int $id, string $action, string $reason = ''): array
+    {
+        $selfOrders = app(SelfOrderService::class);
+        $order = $this->selfOrdersEnabled() ? SelfOrder::query()->forOutlet(app(CurrentOutlet::class)->id())->find($id) : null;
+
+        if (! $order) {
+            return ['ok' => false, 'message' => 'Pesanan tidak ditemukan. Muat ulang daftar pesanan.'];
+        }
+
+        $user = auth()->user();
+        $ticketUrls = fn (): array => $order->kitchenTickets()->where('status', KitchenTicket::STATUS_PENDING)->latest('id')->limit(1)->get()
+            ->map(fn (KitchenTicket $ticket) => route('print.kitchen-ticket', $ticket))->all();
+
+        try {
+            switch ($action) {
+                case 'accept':
+                    $selfOrders->accept($order, $user);
+
+                    return ['ok' => true, 'message' => "{$order->label()} diterima dan masuk open bill.", 'ticket_urls' => $ticketUrls()];
+                case 'verify':
+                    $sale = $selfOrders->verifyPayment($order, $user);
+
+                    return ['ok' => true, 'message' => "Pembayaran {$order->number} diverifikasi. Transaksi {$sale->number} tersimpan.", 'ticket_urls' => $sale->kitchenTickets()->pluck('id')->map(fn ($ticketId) => route('print.kitchen-ticket', $ticketId))->all(), 'receipt_url' => route('pos.receipt', $sale)];
+                case 'reject_payment':
+                    $selfOrders->rejectPayment($order);
+
+                    return ['ok' => true, 'message' => 'Pembayaran ditandai tidak ditemukan. Pilih tagih di kasir atau batalkan pesanannya.'];
+                case 'bill':
+                    $selfOrders->billAtCashier($order, $user);
+
+                    return ['ok' => true, 'message' => "{$order->label()} dialihkan ke bayar di kasir."];
+                case 'cancel':
+                    $selfOrders->cancel($order, $reason !== '' ? $reason : 'Ditolak kasir');
+
+                    return ['ok' => true, 'message' => "Pesanan {$order->number} dibatalkan."];
+                case 'served':
+                    $selfOrders->markServed($order);
+
+                    return ['ok' => true, 'message' => "{$order->label()} ditandai sudah diantar."];
+            }
+        } catch (PosException $exception) {
+            return ['ok' => false, 'message' => $exception->getMessage()];
+        }
+
+        return ['ok' => false, 'message' => 'Aksi tidak dikenal.'];
+    }
+
+    /**
+     * Keranjang untuk *Proses Bayar* pesanan QR (harga terkunci dari snapshot).
+     *
+     * @return array<string, mixed>
+     */
+    #[Renderless]
+    public function selfOrderCart(int $id, SelfOrderService $selfOrders): array
+    {
+        $order = $this->selfOrdersEnabled() ? SelfOrder::query()->forOutlet(app(CurrentOutlet::class)->id())->with('items')->find($id) : null;
+
+        if (! $order) {
+            return ['ok' => false, 'message' => 'Pesanan tidak ditemukan. Muat ulang daftar pesanan.'];
+        }
+
+        try {
+            return ['ok' => true, 'cart' => $selfOrders->cartFor($order)];
+        } catch (PosException $exception) {
+            return ['ok' => false, 'message' => $exception->getMessage()];
+        }
+    }
+
+    private function selfOrderAttentionCount(): int
+    {
+        if (! $this->selfOrdersEnabled()) {
+            return 0;
+        }
+
+        return SelfOrder::query()->forOutlet(app(CurrentOutlet::class)->id())->open()
+            ->where(fn (Builder $query) => $query->whereIn('status', [SelfOrder::STATUS_PENDING, SelfOrder::STATUS_READY])
+                ->orWhereIn('payment_status', [SelfOrder::PAYMENT_PENDING_VERIFICATION, SelfOrder::PAYMENT_REJECTED]))
+            ->count();
+    }
+
     /**
      * Resep yang masih bisa ditebus, untuk ditautkan ke keranjang.
      *
@@ -610,6 +782,10 @@ class Cashier extends Component
                 'createUrl' => $user->can('pharmacy.prescription.manage') ? route('pharmacy.prescriptions', ['create' => 1]) : null,
             ],
             'qris' => PosSettings::qrisPayload() !== null,
+            'selfOrder' => [
+                'enabled' => $this->selfOrdersEnabled(),
+                'count' => $this->selfOrderAttentionCount(),
+            ],
             'display' => [
                 'enabled' => $this->displayAvailable(),
                 'linked' => (bool) $user->display_key,

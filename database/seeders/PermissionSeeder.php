@@ -102,6 +102,12 @@ class PermissionSeeder extends Seeder
                 'description' => 'Melihat tiket dapur pesanan yang masuk dan menandainya selesai.',
             ],
         ],
+        'Pesanan QR' => [
+            'self-order.manage' => [
+                'label' => 'Kelola Meja & Pesanan QR',
+                'description' => 'Mengatur daftar meja, mencetak QR, dan membuka/menutup pemesanan lewat QR.',
+            ],
+        ],
         'Laporan & Audit' => [
             'reports.sales.view' => [
                 'label' => 'Laporan Penjualan',
@@ -156,7 +162,7 @@ class PermissionSeeder extends Seeder
             'settings.company.manage', 'settings.pos.manage',
             'users.manage',
             'pharmacy.prescription.view', 'pharmacy.prescription.manage',
-            'kitchen.view', 'orders.manage',
+            'kitchen.view', 'orders.manage', 'self-order.manage',
         ],
         'kasir' => [
             'pos.sell', 'receivables.manage',

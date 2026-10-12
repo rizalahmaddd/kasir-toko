@@ -60,6 +60,11 @@
 
                         {{-- Kanan: Theme Toggle & Notifikasi --}}
                         <div class="flex items-center justify-end gap-1 shrink-0 sm:flex-1 sm:basis-0">
+                            <a href="{{ route('app.download') }}" target="_blank" title="{{ __('Unduh aplikasi Android') }}"
+                                class="hidden md:inline-flex items-center gap-1.5 h-8 px-2 xl:px-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 transition shrink-0">
+                                <i data-lucide="smartphone" aria-hidden="true" class="w-4 h-4"></i>
+                                <span class="sr-only xl:not-sr-only">{{ __('Unduh Aplikasi') }}</span>
+                            </a>
                             <livewire:layout.outlet-switcher />
                             <x-theme-toggle />
                             <livewire:layout.notification-bell />

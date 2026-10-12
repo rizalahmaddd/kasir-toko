@@ -5,6 +5,7 @@ namespace App\Livewire\Sales;
 use App\Enums\CashMovementType;
 use App\Models\CashShift;
 use App\Services\Pos\PosException;
+use App\Services\Pos\SelfOrderService;
 use App\Services\Pos\ShiftService;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
@@ -102,6 +103,7 @@ class ShiftShow extends Component
         return view('livewire.sales.shift-show', [
             'summary' => $this->cashShift->summary(),
             'sales' => $this->cashShift->sales()->with('customer')->latest('sold_at')->limit(100)->get(),
+            'openSelfOrders' => app(SelfOrderService::class)->openWhenLastShiftCloses($this->cashShift),
         ])
             ->layout('layouts.app', ['heading' => 'Shift '.$this->cashShift->number])
             ->title('Shift '.$this->cashShift->number);

@@ -12,7 +12,15 @@ class HeldOrder extends Model
     use BelongsToOutlet;
     use BelongsToTenant;
 
-    protected $fillable = ['outlet_id', 'user_id', 'customer_id', 'label', 'cart', 'item_count', 'total', 'order_type', 'table_label'];
+    protected $fillable = ['outlet_id', 'user_id', 'customer_id', 'label', 'cart', 'item_count', 'total', 'order_type', 'table_label', 'self_order_id'];
+
+    /**
+     * @return BelongsTo<SelfOrder, $this>
+     */
+    public function selfOrder(): BelongsTo
+    {
+        return $this->belongsTo(SelfOrder::class);
+    }
 
     /**
      * @return BelongsTo<User, $this>

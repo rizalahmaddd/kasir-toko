@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 /**
  * Cabang di dalam satu toko. Produk, kategori, dan pelanggan dipakai bersama; stok, shift, transaksi,
@@ -108,6 +109,33 @@ class Outlet extends Model
         return $this->is_active && in_array($this->id, $this->tenant?->operationalOutletIds() ?? [], true);
     }
 
+    /**
+     * Token QR standee take away. `code` tidak dipakai karena hanya unik per toko ("PST" ada di setiap toko).
+     */
+    public function selfOrderToken(): string
+    {
+        if (blank($this->self_order_token)) {
+            $this->rotateSelfOrderToken();
+        }
+
+        return $this->self_order_token;
+    }
+
+    public function rotateSelfOrderToken(): string
+    {
+        $this->forceFill(['self_order_token' => Str::random(40)])->saveQuietly();
+
+        return $this->self_order_token;
+    }
+
+    /**
+     * @return HasMany<DiningTable, $this>
+     */
+    public function diningTables(): HasMany
+    {
+        return $this->hasMany(DiningTable::class);
+    }
+
     public function isLockedByPlan(): bool
     {
         return $this->is_active && ! $this->isOperational();
@@ -122,7 +150,8 @@ class Outlet extends Model
             || CashShift::query()->withoutGlobalScopes()->where('outlet_id', $this->id)->exists()
             || StockMovement::query()->withoutGlobalScopes()->where('outlet_id', $this->id)->exists()
             || StockTransfer::query()->where(fn (Builder $query) => $query->where('from_outlet_id', $this->id)->orWhere('to_outlet_id', $this->id))->exists()
-            || StockCount::query()->withoutGlobalScopes()->where('outlet_id', $this->id)->exists();
+            || StockCount::query()->withoutGlobalScopes()->where('outlet_id', $this->id)->exists()
+            || SelfOrder::query()->withoutGlobalScopes()->where('outlet_id', $this->id)->exists();
     }
 
     protected function casts(): array

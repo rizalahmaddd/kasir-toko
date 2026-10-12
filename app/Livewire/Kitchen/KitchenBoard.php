@@ -4,6 +4,7 @@ namespace App\Livewire\Kitchen;
 
 use App\Livewire\Concerns\WithRealtimeRefresh;
 use App\Models\KitchenTicket;
+use App\Services\Pos\KitchenTicketService;
 use App\Support\CurrentOutlet;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
@@ -26,6 +27,12 @@ class KitchenBoard extends Component
     public string $tab = 'pending';
 
     /**
+     * Properti publik, bukan data view: layar membunyikan notifikasi dengan memantau `$wire.pendingCount`,
+     * dan Alpine memanggil nama yang bukan properti sebagai method (error "Public method not found").
+     */
+    public int $pendingCount = 0;
+
+    /**
      * @return Collection<int, KitchenTicket>
      */
     #[Computed]
@@ -40,21 +47,26 @@ class KitchenBoard extends Component
             ->get();
     }
 
-    public function markDone(int $id): void
+    public function markDone(int $id, KitchenTicketService $kitchen): void
     {
         $ticket = KitchenTicket::query()->whereKey($id)->where('status', KitchenTicket::STATUS_PENDING)->first();
 
         if ($ticket) {
-            $ticket->update(['status' => KitchenTicket::STATUS_DONE, 'done_at' => now()]);
+            $kitchen->markDone($ticket);
             $this->dispatch('notify', message: "Pesanan {$ticket->label} selesai.");
         }
 
         unset($this->tickets);
     }
 
-    public function reopen(int $id): void
+    public function reopen(int $id, KitchenTicketService $kitchen): void
     {
-        KitchenTicket::query()->whereKey($id)->first()?->update(['status' => KitchenTicket::STATUS_PENDING, 'done_at' => null]);
+        $ticket = KitchenTicket::query()->whereKey($id)->first();
+
+        if ($ticket) {
+            $kitchen->reopen($ticket);
+        }
+
         unset($this->tickets);
     }
 
@@ -68,8 +80,8 @@ class KitchenBoard extends Component
 
     public function render()
     {
-        return view('livewire.kitchen.kitchen-board', [
-            'pendingCount' => KitchenTicket::query()->where('outlet_id', app(CurrentOutlet::class)->idOrPrimary())->where('status', KitchenTicket::STATUS_PENDING)->count(),
-        ]);
+        $this->pendingCount = KitchenTicket::query()->where('outlet_id', app(CurrentOutlet::class)->idOrPrimary())->where('status', KitchenTicket::STATUS_PENDING)->count();
+
+        return view('livewire.kitchen.kitchen-board');
     }
 }

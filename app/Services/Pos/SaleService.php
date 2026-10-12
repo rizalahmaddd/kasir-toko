@@ -26,6 +26,8 @@ use App\Models\Sale;
 use App\Models\SaleItemComponent;
 use App\Models\SalePayment;
 use App\Models\Scopes\OutletAccessScope;
+use App\Models\SelfOrder;
+use App\Models\SelfOrderItem;
 use App\Models\User;
 use App\Services\DocumentNumberGenerator;
 use App\Support\CurrentOutlet;
@@ -52,6 +54,8 @@ class SaleService
         private KitchenTicketService $kitchen,
         private SerialService $serials,
         private StockCountLateSaleReconciler $lateSales,
+        private StockDemandResolver $demands,
+        private QueueNumberService $queue,
     ) {}
 
     /**
@@ -146,7 +150,9 @@ class SaleService
         $units = ProductUnit::withTrashed()->whereIn('id', collect($data['items'])->pluck('unit_id')->filter()->unique())->get()->keyBy('id');
         $basePriceOf = fn (Product $product): int => (int) ($prices[$product->id] ?? $product->price);
         $unitOf = fn (array $item): ?ProductUnit => isset($item['unit_id']) ? $units->get($item['unit_id']) : null;
-        $tierQuantities = collect($data['items'])->filter(fn (array $item) => ! isset($item['unit_id']))->groupBy('product_id')->map(fn ($rows) => (float) $rows->sum('quantity'));
+        $snapshots = $this->selfOrderSnapshots($data, $outletId, $offline);
+        // Baris pesanan QR memakai harga terkunci, jadi tidak ikut menaikkan jumlah harga grosir baris kasir.
+        $tierQuantities = collect($data['items'])->filter(fn (array $item, int $index) => ! isset($item['unit_id']) && ! isset($snapshots['items'][$index]))->groupBy('product_id')->map(fn ($rows) => (float) $rows->sum('quantity'));
         $priceOf = function (Product $product, ?ProductUnit $unit = null) use ($basePriceOf, $tiers, $tierQuantities): int {
             if ($unit) {
                 return $unit->priceFrom($basePriceOf($product));
@@ -155,12 +161,13 @@ class SaleService
             return CartCalculator::tierPrice($basePriceOf($product), $tiers->get($product->id, []), (float) ($tierQuantities[$product->id] ?? 0));
         };
         $factorOf = fn (?ProductUnit $unit): float => $unit ? (float) $unit->factor : 1.0;
+        $linePriceOf = fn (int $index, Product $product, ?ProductUnit $unit = null): int => isset($snapshots['items'][$index]) ? (int) $snapshots['items'][$index]->price : $priceOf($product, $unit);
 
         $priceChanges = [];
         $unitPriceChanges = [];
         $unavailable = [];
         $unavailableUnits = [];
-        foreach ($data['items'] as $item) {
+        foreach ($data['items'] as $index => $item) {
             $product = $products->get($item['product_id']);
 
             if (! $product || ! $product->is_active) {
@@ -181,7 +188,11 @@ class SaleService
                 continue;
             }
 
-            if ((int) $item['price'] !== $priceOf($product, $unit)) {
+            if (isset($snapshots['items'][$index])) {
+                if ((int) $item['price'] !== $linePriceOf($index, $product)) {
+                    throw new PosException("Harga {$product->name} dari pesanan QR tidak cocok. Muat ulang pesanannya dari kotak masuk Pesanan QR.", 'self_order_invalid', ['self_order_ids' => $snapshots['order_ids']]);
+                }
+            } elseif ((int) $item['price'] !== $priceOf($product, $unit)) {
                 if ($unit) {
                     $unitPriceChanges[$unit->id] = ['price' => $priceOf($product, $unit), 'name' => "{$product->name} ({$unit->name})", 'product_id' => $product->id];
                 } else {
@@ -223,6 +234,14 @@ class SaleService
             $product = $products->get($item['product_id']);
             $expected = 0;
 
+            if (isset($snapshots['items'][$index])) {
+                // Potongan ED dekat ikut terkunci saat pelanggan submit, proporsional bila kasir mengurangi jumlahnya.
+                $snapshot = $snapshots['items'][$index];
+                $autoDiscounts[$index] = (int) round($snapshot->discount_amount * min(1, (float) $item['quantity'] / max(0.001, (float) $snapshot->quantity)));
+
+                continue;
+            }
+
             if (! isset($item['unit_id']) && isset($nearLeft[$product->id])) {
                 $quantity = (float) $item['quantity'];
                 $expected = CartCalculator::nearExpiryDiscount($priceOf($product), $quantity, $nearLeft[$product->id], $nearPercent);
@@ -240,9 +259,26 @@ class SaleService
             ]);
         }
 
-        $modifierLines = Features::enabledAt('business.modifiers', $outletId) || collect($data['items'])->contains(fn (array $item) => ! empty($item['modifiers']))
-            ? $this->modifiers->resolve($data['items'], $products, $modifiers, $offline)
+        $catalogItems = array_diff_key($data['items'], $snapshots['items']);
+        $modifierLines = Features::enabledAt('business.modifiers', $outletId) || collect($catalogItems)->contains(fn (array $item) => ! empty($item['modifiers']))
+            ? $this->modifiers->resolve($catalogItems, $products, $modifiers, $offline)
             : ['lines' => [], 'flags' => []];
+
+        foreach ($snapshots['items'] as $index => $snapshot) {
+            $chosen = collect($snapshot->modifiers ?? []);
+            $current = $chosen->sum(fn (array $row) => (int) ($modifiers->get((int) $row['id'])?->price ?? -1));
+            $modifierLines['lines'][$index] = [
+                'total' => (int) $snapshot->modifiers_total,
+                'snapshot' => $chosen->values()->all(),
+                'ingredients' => $chosen->map(fn (array $row) => $modifiers->get((int) $row['id']))
+                    ->filter(fn (?Modifier $modifier) => $modifier !== null && $modifier->usesIngredient())
+                    ->map(fn (Modifier $modifier) => ['product_id' => (int) $modifier->product_id, 'quantity' => (float) $modifier->ingredient_quantity])->values()->all(),
+            ];
+
+            if ((int) $snapshot->price !== $priceOf($products->get($snapshot->product_id)) || ($chosen->isNotEmpty() && $current !== (int) $snapshot->modifiers_total)) {
+                $modifierLines['flags'][] = 'self_order_price_snapshot';
+            }
+        }
 
         $baseQuantities = collect($data['items'])->map(fn (array $item) => round((float) $item['quantity'] * $factorOf($unitOf($item)), 3))->all();
         $prescription = $this->prescriptions->resolveForSale($cashier, $outletId, $products, $data, $baseQuantities);
@@ -252,32 +288,28 @@ class SaleService
         foreach ($data['items'] as $index => $item) {
             $product = $products->get($item['product_id']);
 
-            foreach ($this->stockDemands($product, $baseQuantities[$index], (float) $item['quantity'], $components, $modifierLines['lines'][$index]['ingredients'] ?? []) as $demand) {
+            foreach ($this->demands->forLine($product, $baseQuantities[$index], (float) $item['quantity'], $components, $modifierLines['lines'][$index]['ingredients'] ?? []) as $demand) {
                 $demands[$index][] = $demand;
             }
         }
 
-        if (! PosSettings::allowNegativeStock()) {
-            $needed = collect($demands)->flatten(1)->groupBy('product_id')->map(fn ($rows) => round((float) $rows->sum('quantity'), 3));
-
-            foreach ($needed as $productId => $quantity) {
-                $product = $locked->get($productId);
-                $available = (float) ($stocks->get($productId)?->stock ?? 0);
-
-                if ($product && $product->track_stock && round($available - $quantity, 3) < 0) {
-                    $left = NumberFormatter::quantity(max(0, $available));
-
-                    throw new PosException("Stok {$product->name} tidak cukup (tersisa {$left} {$product->unit}).", 'insufficient_stock', ['stock' => [$product->id => $available]]);
-                }
-            }
-        }
+        $this->demands->ensureAvailable($demands, $locked, $stocks);
 
         $orderType = Features::enabledAt('business.order-type', $outletId) ? OrderType::tryFrom((string) ($data['order_type'] ?? ''))?->value : null;
         $tableLabel = $orderType !== null && filled($data['table_label'] ?? null) ? mb_substr(trim((string) $data['table_label']), 0, 30) : null;
         $taxRate = PosSettings::taxRate();
         $serviceRate = PosSettings::serviceChargeRate($orderType);
+
+        // Pesanan yang sudah dibayar pelanggan lewat QRIS memakai pajak & service charge saat ia submit, supaya
+        // nominal yang sudah ditransfer tetap sama dengan totalnya. Yang dibayar di kasir memakai tarif sekarang,
+        // sama dengan yang dihitung layar kasir.
+        if ($snapshots['sole']?->payment_status === SelfOrder::PAYMENT_PENDING_VERIFICATION) {
+            $taxRate = (float) $snapshots['sole']->tax_rate;
+            $serviceRate = (float) $snapshots['sole']->service_charge_rate;
+        }
+
         $lines = collect($data['items'])->map(fn (array $item, int $index) => [
-            'price' => $priceOf($products->get($item['product_id']), $unitOf($item)),
+            'price' => $linePriceOf($index, $products->get($item['product_id']), $unitOf($item)),
             'modifiers' => $modifierLines['lines'][$index]['total'] ?? 0,
             'quantity' => (float) $item['quantity'],
             'discount' => (int) ($item['discount'] ?? 0) + $autoDiscounts[$index],
@@ -347,7 +379,7 @@ class SaleService
             'prescription_id' => $prescription['prescription']?->id,
             'order_type' => $orderType,
             'table_label' => $tableLabel,
-            'queue_number' => $orderType !== null ? $this->nextQueueNumber($outletId) : null,
+            'queue_number' => $orderType !== null ? ($snapshots['sole']?->queue_number ?? $this->queue->next($outletId)) : null,
             'customer_order_id' => $order?->id,
         ]);
 
@@ -374,7 +406,7 @@ class SaleService
                 'sku' => $product->sku,
                 'unit' => $unit?->name ?? $product->unit,
                 'quantity' => $quantity,
-                'price' => $priceOf($product, $unit),
+                'price' => $linePriceOf($index, $product, $unit),
                 'cost_price' => (int) round($product->cost_price * $factorOf($unit)),
                 'discount_amount' => $line['discount'],
                 'total' => $line['total'],
@@ -429,8 +461,10 @@ class SaleService
         }
 
         if ($orderType !== null) {
-            $this->kitchen->send($kitchenItems, (array) ($data['kitchen_sent'] ?? []), KitchenTicketService::label($tableLabel, $sale->orderLabel()), $orderType, $cashier, $sale, $outletId);
+            $this->kitchen->send($kitchenItems, (array) ($data['kitchen_sent'] ?? []), KitchenTicketService::label($tableLabel, $sale->orderLabel()).($snapshots['order_ids'] !== [] ? ' · QR' : ''), $orderType, $cashier, $sale, $outletId, count($snapshots['order_ids']) === 1 ? $snapshots['order_ids'][0] : null);
         }
+
+        app(SelfOrderService::class)->attachSale($snapshots['order_ids'], $sale);
 
         if ($flags !== []) {
             $sale->forceFill(['flags' => array_values(array_unique($flags))])->saveQuietly();
@@ -479,6 +513,64 @@ class SaleService
     }
 
     /**
+     * Baris keranjang yang berasal dari pesanan QR, dikunci bersama pesanannya. Harga, pilihan tambahan,
+     * dan potongannya diambil dari snapshot, bukan dari katalog. `sole` terisi bila seluruh keranjang adalah
+     * satu pesanan QR yang tidak digabung ke open bill meja (take away, QRIS, atau bayar dulu).
+     *
+     * @param  array<string, mixed>  $data
+     * @return array{items: array<int, SelfOrderItem>, order_ids: list<int>, sole: ?SelfOrder}
+     *
+     * @throws PosException
+     */
+    private function selfOrderSnapshots(array $data, int $outletId, bool $offline): array
+    {
+        $itemIds = collect($data['items'])->pluck('self_order_item_id')->filter()->map(fn ($id) => (int) $id)->unique();
+        $empty = ['items' => [], 'order_ids' => [], 'sole' => null];
+
+        if ($itemIds->isEmpty()) {
+            return $empty;
+        }
+
+        $rows = SelfOrderItem::query()->whereIn('id', $itemIds)->get()->keyBy('id');
+        $orders = SelfOrder::query()->withoutGlobalScope(OutletAccessScope::class)->whereIn('id', $rows->pluck('self_order_id')->unique())->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+        $payable = fn (?SelfOrder $order): bool => $order !== null && $order->outlet_id === $outletId && $order->isPayable();
+        $items = [];
+        $used = [];
+
+        foreach ($data['items'] as $index => $item) {
+            $row = isset($item['self_order_item_id']) ? $rows->get((int) $item['self_order_item_id']) : null;
+
+            if (! isset($item['self_order_item_id'])) {
+                continue;
+            }
+
+            $used[$row?->id ?? 0] = round(($used[$row?->id ?? 0] ?? 0) + (float) $item['quantity'], 3);
+            $valid = $row !== null && $payable($orders->get($row->self_order_id)) && $row->product_id === (int) $item['product_id']
+                && ! isset($item['unit_id']) && $used[$row->id] <= round((float) $row->quantity, 3);
+
+            if (! $valid) {
+                // Transaksi offline sudah terjadi; barisnya dicatat sebagai baris kasir biasa.
+                if ($offline) {
+                    continue;
+                }
+
+                throw new PosException('Ada baris dari pesanan QR yang sudah dibayar, dibatalkan, atau diubah. Hapus baris itu dari keranjang lalu bayar lagi.', 'self_order_invalid', ['self_order_item_ids' => [(int) $item['self_order_item_id']]]);
+            }
+
+            $items[$index] = $row;
+        }
+
+        $orderIds = collect($items)->pluck('self_order_id')->unique()->map(fn ($id) => (int) $id)->values()->all();
+        $sole = count($orderIds) === 1 && count($items) === count($data['items']) ? $orders->get($orderIds[0]) : null;
+
+        return [
+            'items' => $items,
+            'order_ids' => $orderIds,
+            'sole' => $sole && ! ($sole->held_order_id !== null && filled($sole->table_label)) ? $sole : null,
+        ];
+    }
+
+    /**
      * Pesanan yang dilunasi lewat checkout ini. Transaksi offline atas pesanan yang sudah selesai/dibatalkan
      * tetap dicatat, hanya tanpa tautan pesanan.
      *
@@ -497,43 +589,6 @@ class SaleService
         }
 
         throw new PosException('Pesanan ini sudah selesai atau dibatalkan. Lepaskan pesanan dari keranjang.', 'order_closed');
-    }
-
-    /**
-     * Potongan stok satu baris dalam satuan dasar. Produk racikan yang stoknya tidak dilacak memotong bahannya;
-     * source null berarti barang itu sendiri (dicatat per batch di sale_item_batches).
-     *
-     * @param  Collection<int, Collection<int, ProductComponent>>  $components
-     * @param  list<array{product_id: int, quantity: float}>  $ingredients
-     * @return list<array{product_id: int, quantity: float, source: ?string}>
-     */
-    private function stockDemands(Product $product, float $baseQuantity, float $quantity, Collection $components, array $ingredients): array
-    {
-        $demands = [];
-
-        if ($product->track_stock) {
-            $demands[] = ['product_id' => $product->id, 'quantity' => $baseQuantity, 'source' => null];
-        } else {
-            foreach ($components->get($product->id, []) as $component) {
-                $demands[] = ['product_id' => (int) $component->component_id, 'quantity' => round((float) $component->quantity * $baseQuantity, 3), 'source' => SaleItemComponent::SOURCE_RECIPE];
-            }
-        }
-
-        foreach ($ingredients as $ingredient) {
-            $demands[] = ['product_id' => $ingredient['product_id'], 'quantity' => round($ingredient['quantity'] * $quantity, 3), 'source' => SaleItemComponent::SOURCE_MODIFIER];
-        }
-
-        return array_values(array_filter($demands, fn (array $demand) => $demand['quantity'] > 0));
-    }
-
-    /**
-     * Nomor antrean harian per outlet. Baris outlet dikunci supaya dua kasir tidak mendapat nomor yang sama.
-     */
-    private function nextQueueNumber(int $outletId): int
-    {
-        Outlet::query()->whereKey($outletId)->lockForUpdate()->first();
-
-        return (int) Sale::query()->where('outlet_id', $outletId)->whereDate('sold_at', today())->max('queue_number') + 1;
     }
 
     /**
@@ -613,6 +668,9 @@ class SaleService
             'items.*.note' => ['nullable', 'string', 'max:150'],
             'items.*.unit_id' => ['nullable', 'integer'],
             'items.*.batch_id' => ['nullable', 'integer'],
+            'items.*.self_order_item_id' => ['nullable', 'integer'],
+            'self_order_ids' => ['nullable', 'array', 'max:50'],
+            'self_order_ids.*' => ['integer'],
             'items.*.modifiers' => ['nullable', 'array', 'max:20'],
             'items.*.modifiers.*.id' => ['required', 'integer'],
             'items.*.modifiers.*.price' => ['required', 'integer', 'min:0', 'max:999999999'],

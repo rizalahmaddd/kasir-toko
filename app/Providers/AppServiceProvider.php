@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Http\Controllers\SelfOrderController;
 use App\Http\Middleware\EnsureFeatureEnabled;
 use App\Http\Middleware\EnsureTenantAccess;
 use App\Models\Scopes\TenantScope;
@@ -107,7 +108,22 @@ class AppServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('display', fn (Request $request) => Limit::perMinute(300)->by($request->user()?->id ?: $request->ip()));
+        // Pelanggan satu cafe berbagi IP WiFi yang sama, jadi kuncinya token QR + cookie perangkat; batas IP hanya jaring pengaman.
+        RateLimiter::for('self-order', fn (Request $request) => [
+            Limit::perMinute(90)->by('so:'.self::selfOrderKey($request)),
+            Limit::perMinute(1500)->by('so-ip:'.$request->ip()),
+        ]);
+        RateLimiter::for('self-order-submit', fn (Request $request) => Limit::perMinute(6)->by('so-submit:'.self::selfOrderKey($request)));
         RateLimiter::for('api', fn (Request $request) => Limit::perMinute(120)->by($request->user()?->id ?: $request->ip()));
+    }
+
+    private static function selfOrderKey(Request $request): string
+    {
+        $route = $request->route();
+        $token = $route?->parameter('tableToken') ?? $route?->parameter('outletToken') ?? $route?->parameter('token') ?? $route?->parameter('sessionToken');
+        $device = $request->cookie(SelfOrderController::DEVICE_COOKIE);
+
+        return $token.'|'.(is_string($device) && $device !== '' ? $device : $request->ip());
     }
 
     private function bootTenancy(): void

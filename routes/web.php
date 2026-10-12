@@ -50,6 +50,7 @@ require __DIR__.'/pos.php';
 require __DIR__.'/master-data.php';
 require __DIR__.'/pharmacy.php';
 require __DIR__.'/kitchen.php';
+require __DIR__.'/self-order.php';
 require __DIR__.'/orders.php';
 require __DIR__.'/reports.php';
 require __DIR__.'/settings.php';

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\CustomerOrder;
 use App\Models\DeliveryNote;
+use App\Models\DiningTable;
 use App\Models\ModifierGroup;
 use App\Models\Outlet;
 use App\Models\Prescription;
@@ -133,6 +134,7 @@ class BusinessCapabilities
             'business.modifiers' => fn () => ModifierGroup::query()->exists(),
             'business.tiered-price' => fn () => ProductPriceTier::query()->exists(),
             'business.order-type' => fn () => Sale::query()->whereNotNull('order_type')->exists(),
+            'business.self-order' => fn () => DiningTable::query()->withoutGlobalScopes([OutletAccessScope::class])->exists(),
             'business.variants' => fn () => Product::query()->whereNotNull('parent_id')->exists(),
             'business.serial-number' => fn () => ProductSerial::query()->exists(),
             'business.pre-order' => fn () => CustomerOrder::query()->withoutGlobalScopes([OutletAccessScope::class])->exists(),

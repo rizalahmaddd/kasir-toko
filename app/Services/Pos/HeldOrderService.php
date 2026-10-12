@@ -6,6 +6,7 @@ use App\Enums\OrderType;
 use App\Models\Customer;
 use App\Models\HeldOrder;
 use App\Models\KitchenTicket;
+use App\Models\SelfOrder;
 use App\Models\User;
 use App\Support\CurrentOutlet;
 use App\Support\Features;
@@ -24,7 +25,8 @@ class HeldOrderService
     public function __construct(private KitchenTicketService $kitchen) {}
 
     /**
-     * Milik akun ini di outlet aktif, ditambah open bill meja dari kasir lain.
+     * Milik akun ini di outlet aktif, ditambah open bill meja dari kasir lain dan pesanan QR (dibuat atas
+     * nama pemilik shift, tapi boleh dilanjutkan kasir mana pun di outlet itu).
      *
      * @return Builder<HeldOrder>
      */
@@ -34,7 +36,9 @@ class HeldOrderService
 
         return HeldOrder::query()
             ->forOutlet(app(CurrentOutlet::class)->id())
-            ->where(fn (Builder $query) => $query->where('user_id', $user->id)->when($tables, fn (Builder $query) => $query->orWhereNotNull('table_label')));
+            ->where(fn (Builder $query) => $query->where('user_id', $user->id)
+                ->orWhereNotNull('self_order_id')
+                ->when($tables, fn (Builder $query) => $query->orWhereNotNull('table_label')));
     }
 
     /**
@@ -43,7 +47,7 @@ class HeldOrderService
      *
      * @throws PosException
      */
-    public function hold(User $user, array $cart, string $label = ''): array
+    public function hold(User $user, array $cart, string $label = '', ?SelfOrder $selfOrder = null): array
     {
         $items = array_values(array_filter($cart['items'] ?? [], 'is_array'));
 
@@ -60,12 +64,12 @@ class HeldOrderService
         $table = $orderType === OrderType::DineIn->value && filled($cart['table'] ?? null) ? mb_substr(trim((string) $cart['table']), 0, 30) : null;
         $cart['items'] = $items;
 
-        return DB::transaction(function () use ($user, $cart, $label, $orderType, $table) {
+        return DB::transaction(function () use ($user, $cart, $label, $orderType, $table, $selfOrder) {
             $existing = $table !== null
                 ? HeldOrder::query()->forOutlet(app(CurrentOutlet::class)->id())->where('table_label', $table)->lockForUpdate()->first()
                 : null;
 
-            if (! $existing) {
+            if (! $existing && ! $selfOrder) {
                 $count = HeldOrder::query()->where('user_id', $user->id)->forOutlet(app(CurrentOutlet::class)->id())->count();
 
                 if ($count >= self::MAX_PER_USER) {
@@ -75,8 +79,9 @@ class HeldOrderService
 
             $merged = $existing ? $this->merge($existing->cart, $cart) : $cart;
             $label = $table !== null ? "Meja {$table}" : (trim($label) ?: (($cart['customer']['name'] ?? null) ?: 'Pesanan #'.(($count ?? 0) + 1)));
+            $ticketLabel = KitchenTicketService::label($table, $label).($selfOrder ? ' · QR' : '');
             $ticket = $orderType !== null
-                ? $this->kitchen->send($merged['items'], (array) ($merged['kitchenSent'] ?? []), KitchenTicketService::label($table, $label), $orderType, $user)
+                ? $this->kitchen->send($merged['items'], (array) ($merged['kitchenSent'] ?? []), $ticketLabel, $orderType, $user, null, null, $selfOrder?->id)
                 : null;
 
             if ($orderType !== null) {
@@ -96,16 +101,35 @@ class HeldOrderService
 
             if ($existing) {
                 $existing->update($attributes);
-
-                return ['order' => $existing, 'merged' => true, 'ticket' => $ticket];
             }
 
-            return ['order' => HeldOrder::create(['user_id' => $user->id, ...$attributes]), 'merged' => false, 'ticket' => $ticket];
+            $order = $existing ?? HeldOrder::create(['user_id' => $user->id, 'self_order_id' => $selfOrder?->id, ...$attributes]);
+            $this->linkSelfOrders($order, $merged['items']);
+
+            return ['order' => $order, 'merged' => $existing !== null, 'ticket' => $ticket];
         });
     }
 
     /**
+     * Open bill yang dilanjutkan lalu ditunda lagi menjadi baris baru di held_orders; pesanan QR di dalamnya
+     * ditautkan ulang supaya pembatalan pesanan tetap bisa mengeluarkan barisnya dari tagihan.
+     *
+     * @param  list<array<string, mixed>>  $items
+     */
+    private function linkSelfOrders(HeldOrder $order, array $items): void
+    {
+        $ids = collect($items)->pluck('self_order_id')->filter()->map(fn ($id) => (int) $id)->unique();
+
+        if ($ids->isNotEmpty()) {
+            SelfOrder::query()->whereIn('id', $ids)->where('outlet_id', $order->outlet_id)->whereNull('sale_id')
+                ->whereNotIn('status', [SelfOrder::STATUS_CANCELLED, SelfOrder::STATUS_EXPIRED])
+                ->update(['held_order_id' => $order->id]);
+        }
+    }
+
+    /**
      * Item baru digabung ke baris yang sama persis (produk, satuan, pilihan, catatan, tanpa diskon), selain itu ditambahkan.
+     * Baris pesanan QR tidak pernah dilebur: harganya terkunci per self_order_item_id.
      *
      * @param  array<string, mixed>  $current
      * @param  array<string, mixed>  $incoming
@@ -117,7 +141,9 @@ class HeldOrderService
 
         foreach ($incoming['items'] as $item) {
             $signature = KitchenTicketService::signature($item);
-            $index = collect($items)->search(fn (array $line) => KitchenTicketService::signature($line) === $signature && (int) ($line['discount'] ?? 0) === 0 && (int) ($item['discount'] ?? 0) === 0);
+            $index = isset($item['self_order_item_id'])
+                ? false
+                : collect($items)->search(fn (array $line) => ! isset($line['self_order_item_id']) && KitchenTicketService::signature($line) === $signature && (int) ($line['discount'] ?? 0) === 0 && (int) ($item['discount'] ?? 0) === 0);
 
             if ($index === false) {
                 $items[] = $item;
@@ -137,7 +163,7 @@ class HeldOrderService
             'items' => $items,
             'kitchenSent' => $sent,
             'customer' => $current['customer'] ?? $incoming['customer'] ?? null,
-            'note' => trim(implode(' / ', array_filter([$current['note'] ?? null, $incoming['note'] ?? null]))) ?: null,
+            'note' => mb_substr(trim(implode(' / ', array_filter([$current['note'] ?? null, $incoming['note'] ?? null]))), 0, 255) ?: null,
             'total' => (int) ($current['total'] ?? 0) + (int) ($incoming['total'] ?? 0),
         ];
     }

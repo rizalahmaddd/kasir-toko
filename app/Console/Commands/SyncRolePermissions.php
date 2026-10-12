@@ -24,6 +24,8 @@ class SyncRolePermissions extends Command
 
     public const STOCK_COUNT_PERMISSIONS = ['inventory.opname.count', 'inventory.opname.manage', 'reports.stock.view'];
 
+    public const SELF_ORDER_PERMISSIONS = ['self-order.manage'];
+
     protected $signature = 'saas:sync-role-permissions
                             {permission?* : Izin yang ditambahkan ke peran bawaan (default: izin outlet)}';
 

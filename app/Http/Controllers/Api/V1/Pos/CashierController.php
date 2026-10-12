@@ -181,6 +181,7 @@ class CashierController extends Controller
             'serials_enabled' => Features::enabledAt('business.serial-number'),
             'pre_order_enabled' => Features::enabledAt('business.pre-order') && $user->can('orders.manage'),
             'delivery_note_enabled' => Features::enabledAt('business.delivery-note'),
+            'self_order_enabled' => Features::enabledAt('business.self-order') && ($user->tenant?->isPro() ?? true),
         ]);
     }
 
@@ -395,6 +396,11 @@ class CashierController extends Controller
      * (context.stock), `total_mismatch`, `underpaid`, `credit_needs_customer`, `overpaid_non_cash`, `outlet_mismatch`,
      * `unit_unavailable` (context.unit_ids), `expired_batch`, `controlled_drug`, `prescription_required`,
      * `prescription_unverified`, `prescription_exceeded`, `prescription_invalid`.
+     *
+     * Pesanan QR: baris dari `pos/self-orders/{id}/cart` atau open bill membawa `self_order_item_id`; harganya
+     * divalidasi terhadap harga saat pelanggan memesan, bukan katalog (`self_order_invalid` bila pesanannya sudah
+     * dibayar/dibatalkan atau jumlahnya melebihi pesanan; context.self_order_item_ids). Baris ini tidak dihitung
+     * dalam jumlah harga grosir baris lain, dan transaksinya diberi flag `self_order_price_snapshot` bila katalog sudah berubah.
      *
      * Multi-satuan: baris boleh membawa `unit_id`; `price` adalah harga satuan itu dan `quantity` dalam satuan
      * itu (stok dipotong quantity × factor). Perubahan harga satuan dikirim di context.unit_prices (per unit_id).

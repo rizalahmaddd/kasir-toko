@@ -1,9 +1,11 @@
 <?php
 
+use App\Http\Controllers\PrintController;
 use App\Http\Controllers\TenantDataExportController;
 use App\Livewire\Settings\CompanyProfile;
 use App\Livewire\Settings\CustomerDisplaySettingsPage;
 use App\Livewire\Settings\DataExport;
+use App\Livewire\Settings\DiningTables;
 use App\Livewire\Settings\FeatureToggles;
 use App\Livewire\Settings\Outlets;
 use App\Livewire\Settings\PosSettingsPage;
@@ -21,5 +23,13 @@ Route::middleware(['auth', 'verified'])->prefix('pengaturan')->name('settings.')
     Route::get('fitur', FeatureToggles::class)->name('features');
     Route::get('langganan', SubscriptionPage::class)->name('subscription');
     Route::get('ekspor-data', DataExport::class)->middleware('pro')->name('data-export');
+    Route::get('meja', DiningTables::class)->middleware(['pro', 'can:self-order.manage'])->name('tables');
     Route::get('ekspor-data/unduh', TenantDataExportController::class)->middleware(['pro', 'throttle:5,10'])->name('data-export.download');
+});
+
+// QR pesanan untuk ditempel di meja (A6 per meja, A4 berisi banyak meja) dan standee take away.
+Route::middleware(['auth', 'verified', 'pro', 'can:self-order.manage'])->prefix('pengaturan/meja/cetak')->name('print.')->group(function () {
+    Route::get('semua', [PrintController::class, 'tableGrid'])->name('table-grid');
+    Route::get('standee', [PrintController::class, 'selfOrderStandee'])->name('self-order-standee');
+    Route::get('{table}', [PrintController::class, 'tableTent'])->name('table-tent');
 });

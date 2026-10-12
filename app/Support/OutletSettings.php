@@ -36,6 +36,10 @@ class OutletSettings
         'pos.block_expired_sale',
         'pos.near_expiry_discount_percent',
         'pos.near_expiry_discount_days',
+        'pos.self_order_enabled',
+        'pos.self_order_kitchen_flow',
+        'pos.self_order_dine_in_payment',
+        'pos.self_order_expire_minutes',
     ];
 
     /**

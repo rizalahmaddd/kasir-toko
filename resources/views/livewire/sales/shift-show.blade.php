@@ -107,6 +107,18 @@
                     Hitung semua uang tunai di laci, lalu masukkan jumlahnya. Setelah ditutup, shift tidak bisa dipakai transaksi lagi.
                 </x-modal-header>
 
+                @if ($openSelfOrders->isNotEmpty())
+                    <div class="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-200 space-y-1.5">
+                        <p class="font-bold">Masih ada {{ $openSelfOrders->count() }} pesanan QR yang belum selesai</p>
+                        <p>Ini shift terakhir yang berjalan di outlet ini. Setelah ditutup, pelanggan tidak bisa memesan lewat QR dan pesanan di bawah tidak ada yang menanggapi.</p>
+                        <ul class="list-disc list-inside text-amber-200/90">
+                            @foreach ($openSelfOrders->take(8) as $selfOrder)
+                                <li>{{ $selfOrder->label() }} · {{ $selfOrder->customer_name }} · {{ $selfOrder->statusLabel() }}, {{ strtolower($selfOrder->paymentLabel()) }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+
                 <div class="rounded-xl bg-slate-950 border border-slate-800 p-3 flex justify-between items-baseline">
                     <span class="text-xs text-slate-400">Seharusnya di laci</span>
                     <span class="text-lg font-bold text-slate-100 tabular-nums">{{ Num::currency($summary['expected']) }}</span>

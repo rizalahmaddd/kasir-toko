@@ -80,7 +80,7 @@ class KitchenTicketService
      * @param  list<array<string, mixed>>  $items  baris keranjang (nama, jumlah, satuan, pilihan, catatan)
      * @param  array<string, float|int|string>  $sent
      */
-    public function send(array $items, array $sent, string $label, ?string $orderType, ?User $user, ?Sale $sale = null, ?int $outletId = null): ?KitchenTicket
+    public function send(array $items, array $sent, string $label, ?string $orderType, ?User $user, ?Sale $sale = null, ?int $outletId = null, ?int $selfOrderId = null): ?KitchenTicket
     {
         if (! Features::enabledAt('business.order-type', $outletId)) {
             return null;
@@ -95,6 +95,7 @@ class KitchenTicketService
         $ticket = KitchenTicket::create(array_filter([
             'outlet_id' => $outletId,
             'sale_id' => $sale?->id,
+            'self_order_id' => $selfOrderId,
             'user_id' => $user?->id,
             'label' => mb_substr($label, 0, 60),
             'order_type' => OrderType::tryFrom((string) $orderType)?->value,
@@ -105,6 +106,55 @@ class KitchenTicketService
         KitchenTicketCreated::dispatch($ticket);
 
         return $ticket;
+    }
+
+    /**
+     * Dipakai Layar Dapur web dan API mobile, supaya status pesanan QR ikut berubah dari mana pun tiketnya diselesaikan.
+     */
+    public function markDone(KitchenTicket $ticket): KitchenTicket
+    {
+        if ($ticket->status !== KitchenTicket::STATUS_PENDING) {
+            return $ticket;
+        }
+
+        $ticket->update(['status' => KitchenTicket::STATUS_DONE, 'done_at' => now()]);
+        $this->syncSelfOrder($ticket);
+
+        return $ticket;
+    }
+
+    /**
+     * Tiket yang dibatalkan tidak bisa dibuka lagi: pesanannya sudah ditolak.
+     */
+    public function reopen(KitchenTicket $ticket): KitchenTicket
+    {
+        if ($ticket->status !== KitchenTicket::STATUS_DONE) {
+            return $ticket;
+        }
+
+        $ticket->update(['status' => KitchenTicket::STATUS_PENDING, 'done_at' => null]);
+        $this->syncSelfOrder($ticket);
+
+        return $ticket;
+    }
+
+    /**
+     * Tiket yang belum dikerjakan ditarik dari layar dapur; event tiket disiarkan ulang supaya layar memuat ulang.
+     */
+    public function cancelPending(int $selfOrderId): void
+    {
+        KitchenTicket::query()->where('self_order_id', $selfOrderId)->where('status', KitchenTicket::STATUS_PENDING)->get()
+            ->each(function (KitchenTicket $ticket) {
+                $ticket->update(['status' => KitchenTicket::STATUS_CANCELLED]);
+                KitchenTicketCreated::dispatch($ticket);
+            });
+    }
+
+    private function syncSelfOrder(KitchenTicket $ticket): void
+    {
+        if ($ticket->self_order_id !== null) {
+            app(SelfOrderService::class)->refreshFulfilment($ticket->self_order_id);
+        }
     }
 
     /**

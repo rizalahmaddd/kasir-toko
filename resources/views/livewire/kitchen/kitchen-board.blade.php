@@ -77,6 +77,9 @@
                             @if ($type)
                                 <x-badge :color="$type === OrderType::DineIn ? 'sky' : 'slate'">{{ strtoupper($type->shortLabel()) }}</x-badge>
                             @endif
+                            @if ($ticket->self_order_id)
+                                <x-badge color="emerald">PESANAN QR</x-badge>
+                            @endif
                             @unless ($ticket->isDone())
                                 <span @class(['text-[11px] font-semibold tabular-nums', 'text-amber-400' => $minutes >= 15, 'text-slate-400' => $minutes < 15])>{{ $minutes }} mnt</span>
                             @endunless

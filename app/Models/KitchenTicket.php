@@ -20,7 +20,17 @@ class KitchenTicket extends Model
 
     public const STATUS_DONE = 'done';
 
-    protected $fillable = ['outlet_id', 'sale_id', 'user_id', 'label', 'order_type', 'items', 'status', 'done_at'];
+    public const STATUS_CANCELLED = 'cancelled';
+
+    protected $fillable = ['outlet_id', 'sale_id', 'self_order_id', 'user_id', 'label', 'order_type', 'items', 'status', 'done_at'];
+
+    /**
+     * @return BelongsTo<SelfOrder, $this>
+     */
+    public function selfOrder(): BelongsTo
+    {
+        return $this->belongsTo(SelfOrder::class);
+    }
 
     /**
      * @return BelongsTo<Sale, $this>

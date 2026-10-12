@@ -7,6 +7,7 @@ use App\Models\CashShift;
 use App\Models\Customer;
 use App\Models\CustomerOrder;
 use App\Models\DeliveryNote;
+use App\Models\DiningTable;
 use App\Models\KitchenTicket;
 use App\Models\Sale;
 use App\Models\StockCount;
@@ -15,6 +16,7 @@ use App\Models\User;
 use App\Support\CurrentOutlet;
 use App\Support\OutletIdentity;
 use App\Support\PosSettings;
+use App\Support\QrCodeSvg;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 
@@ -99,6 +101,42 @@ class PrintController extends Controller
             'shift' => $cashShift,
             'summary' => $cashShift->summary(),
             'width' => PosSettings::receiptWidth(),
+        ]);
+    }
+
+    /**
+     * QR satu meja ukuran A6 untuk akrilik meja.
+     */
+    public function tableTent(DiningTable $table): View
+    {
+        return view('print.table-tent', [
+            'table' => $table,
+            'outlet' => $table->outlet,
+            'qr' => QrCodeSvg::render($table->orderUrl()),
+        ]);
+    }
+
+    /**
+     * Semua meja aktif outlet ini dalam lembar A4 untuk dicetak sebagai stiker.
+     */
+    public function tableGrid(): View
+    {
+        $outlet = app(CurrentOutlet::class)->get() ?? abort(404);
+
+        return view('print.table-grid', [
+            'outlet' => $outlet,
+            'tables' => DiningTable::query()->forOutlet($outlet->id)->where('is_active', true)->orderBy('sort_order')->orderBy('name')->get()
+                ->map(fn (DiningTable $table) => ['name' => $table->name, 'area' => $table->area, 'qr' => QrCodeSvg::render($table->orderUrl())]),
+        ]);
+    }
+
+    public function selfOrderStandee(): View
+    {
+        $outlet = app(CurrentOutlet::class)->get() ?? abort(404);
+
+        return view('print.self-order-standee', [
+            'outlet' => $outlet,
+            'qr' => QrCodeSvg::render(route('self-order.outlet', $outlet->selfOrderToken())),
         ]);
     }
 

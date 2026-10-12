@@ -76,6 +76,12 @@ function posCashier(config) {
         customerLoading: false,
         customerForm: { open: false, name: '', phone: '', error: '', saving: false },
 
+        selfOrders: [],
+        selfOrdersLoading: false,
+        selfOrderBusy: null,
+        selfOrderCount: config.selfOrder?.count || 0,
+        selfOrderCancel: null,
+
         heldOrders: [],
         heldLoading: false,
         holdLabel: '',
@@ -127,6 +133,12 @@ function posCashier(config) {
 
             this.$watch('qrisAmount', (amount) => this.loadQris(amount));
 
+            if (this.config.selfOrder?.enabled) {
+                window.addEventListener('pos-self-order', (event) => this.onSelfOrderSignal(event.detail || {}));
+                // Cadangan bila websocket putus; sinyal realtime tetap jalur utamanya.
+                this.selfOrderTimer = setInterval(() => this.refreshSelfOrders(true), 60000);
+            }
+
             window.addEventListener('online', () => (this.online = true));
             window.addEventListener('offline', () => (this.online = false));
 
@@ -142,6 +154,7 @@ function posCashier(config) {
         },
 
         destroy() {
+            clearInterval(this.selfOrderTimer);
             this.stopCamera();
             this.display.channel?.close();
         },
@@ -332,11 +345,12 @@ function posCashier(config) {
         // Perhitungan (cart-math.js, sama dengan CartCalculator)
 
         // Harga satuan efektif: satuan jual memakai harganya sendiri, satuan dasar bisa turun ke harga grosir.
+        // Baris pesanan QR memakai harga saat pelanggan memesan dan tidak ikut hitungan grosir (sama dengan SaleService).
         linePrice(line) {
-            if (line.unit_id || !line.tiers?.length) {
+            if (line.unit_id || line.self_order_item_id || !line.tiers?.length) {
                 return line.price;
             }
-            const qty = this.cart.items.filter((l) => l.product_id === line.product_id && !l.unit_id).reduce((sum, l) => sum + Number(l.quantity), 0);
+            const qty = this.cart.items.filter((l) => l.product_id === line.product_id && !l.unit_id && !l.self_order_item_id).reduce((sum, l) => sum + Number(l.quantity), 0);
             return tierPrice(line.price, line.tiers, qty);
         },
 
@@ -346,6 +360,10 @@ function posCashier(config) {
             const left = {};
             const result = {};
             for (const line of this.cart.items) {
+                if (line.self_order_item_id) {
+                    result[line.key] = Math.round((line.auto_discount || 0) * Math.min(1, Number(line.quantity) / Math.max(0.001, Number(line.self_order_quantity) || 1)));
+                    continue;
+                }
                 if (line.unit_id || !(line.near_expiry > 0)) {
                     result[line.key] = 0;
                     continue;
@@ -474,7 +492,7 @@ function posCashier(config) {
             const unit = unitId !== undefined ? this.unitOf(product, unitId ?? product.unit_id) : (units.find((u) => u.default) ?? this.unitOf(product, product.unit_id));
             const factor = unit ? unit.factor : 1;
             const key = modifierKey(modifiers);
-            const line = serials ? null : this.cart.items.find((l) => l.product_id === product.id && (l.unit_id ?? null) === (unit?.id ?? null) && modifierKey(l.modifiers) === key && !l.note && !l.discount);
+            const line = serials ? null : this.cart.items.find((l) => l.product_id === product.id && !l.self_order_item_id && (l.unit_id ?? null) === (unit?.id ?? null) && modifierKey(l.modifiers) === key && !l.note && !l.discount);
             const current = line ? Number(line.quantity) : 0;
             const added = serials ? serials.length : 1;
 
@@ -706,6 +724,10 @@ function posCashier(config) {
                 return;
             }
             const next = Number(line.quantity) + 1;
+            if (line.self_order_item_id && next > Number(line.self_order_quantity)) {
+                notify('Jumlah dari pesanan QR tidak bisa ditambah. Tambahkan menunya sebagai baris baru.', 'error');
+                return;
+            }
             if (this.stockAllows(line, next)) {
                 if (this.config.allowNegative && line.track && (line.stock === null || line.stock <= 0 || next * (Number(line.factor) || 1) > line.stock)) {
                     const curStock = line.stock !== null ? quantity(line.stock) : '0';
@@ -769,6 +791,10 @@ function posCashier(config) {
             const qty = Math.round(parseFloat(String(this.editing.quantity).replace(',', '.')) * 1000) / 1000;
             if (!(qty > 0)) {
                 this.editing.error = 'Jumlah harus lebih dari 0.';
+                return;
+            }
+            if (line.self_order_item_id && qty > Number(line.self_order_quantity)) {
+                this.editing.error = 'Jumlah dari pesanan QR tidak bisa ditambah. Tambahkan menunya sebagai baris baru.';
                 return;
             }
             const unit = this.editing.units.find((u) => u.id === this.editing.unit_id) ?? null;
@@ -860,6 +886,11 @@ function posCashier(config) {
                 if (!product) {
                     removed.push(line.name);
                     return false;
+                }
+                if (line.self_order_item_id) {
+                    line.stock = product.stock;
+                    line.track = product.track;
+                    return true;
                 }
                 line.units = this.config.multiUnit ? product.units || [] : [];
                 line.tiers = this.config.tieredPrice ? product.tiers || [] : [];
@@ -1193,6 +1224,83 @@ function posCashier(config) {
             this.$wire.$refresh();
         },
 
+        // Pesanan QR (self-order)
+
+        async openSelfOrders() {
+            openModal('pos-self-orders');
+            await this.refreshSelfOrders();
+        },
+
+        async refreshSelfOrders(silent = false) {
+            if (!this.config.selfOrder?.enabled) {
+                return;
+            }
+            this.selfOrdersLoading = !silent;
+            try {
+                this.selfOrders = await this.$wire.selfOrders();
+                this.selfOrderCount = this.selfOrders.filter((o) => o.action || o.status === 'ready').length;
+            } catch {
+                // jaringan putus: daftar lama tetap tampil, dicoba lagi di sinyal atau polling berikutnya
+            } finally {
+                this.selfOrdersLoading = false;
+            }
+        },
+
+        onSelfOrderSignal(detail) {
+            if (detail.kind === 'new') {
+                notify(`Pesanan QR baru: ${detail.label}.`);
+                navigator.vibrate?.(60);
+            } else if (detail.kind === 'ready') {
+                notify(`${detail.label} siap${detail.customer ? ` (${detail.customer})` : ''}. Antar atau panggil pelanggannya.`);
+                navigator.vibrate?.([120, 80, 120]);
+            }
+            this.refreshSelfOrders(true);
+        },
+
+        async selfOrderAct(order, action, reason = '') {
+            if (this.selfOrderBusy) {
+                return;
+            }
+            this.selfOrderBusy = `${order.id}:${action}`;
+            try {
+                const result = await this.$wire.selfOrderAction(order.id, action, reason);
+                notify(result.message, result.ok ? 'success' : 'error');
+                if (result.ok) {
+                    this.selfOrderCancel = null;
+                    (result.ticket_urls || []).forEach((url) => this.printKitchenTicket(url));
+                    this.$wire.$refresh();
+                }
+            } finally {
+                this.selfOrderBusy = null;
+                await this.refreshSelfOrders(true);
+            }
+        },
+
+        // Pesanan yang sudah diterima ditagih lewat open bill-nya; ini jalan pintas ke tagihan itu.
+        async openSelfOrderBill(order) {
+            closeModal('pos-self-orders');
+            await this.resumeHeld({ id: order.held_order_id, label: `Open bill ${order.label}` });
+            await this.refreshSelfOrders(true);
+        },
+
+        // Proses Bayar: pesanan dimuat ke keranjang dengan harga terkunci, lalu dibayar seperti transaksi biasa.
+        async processSelfOrder(order) {
+            if (this.cart.items.length && !(await this.holdCurrent(this.cart.customer?.name || 'Sebelum pesanan QR'))) {
+                return;
+            }
+            const result = await this.$wire.selfOrderCart(order.id);
+            if (!result.ok) {
+                notify(result.message, 'error');
+                await this.refreshSelfOrders(true);
+                return;
+            }
+            const cart = result.cart;
+            this.cart = { ...this.newCart(), items: cart.items, orderType: cart.orderType, table: cart.table || '', kitchenSent: cart.kitchenSent || {}, note: cart.note || '' };
+            closeModal('pos-self-orders');
+            await this.syncCart(true);
+            notify(`${cart.label} dimuat ke keranjang. Terima pembayarannya untuk meneruskan ke dapur.`);
+        },
+
         // Pembayaran
 
         openPay() {
@@ -1376,7 +1484,9 @@ function posCashier(config) {
                     note: l.note || null,
                     modifiers: (l.modifiers || []).map((m) => ({ id: m.id, name: m.name, price: m.price })),
                     serials: l.serial ? l.serials || [] : undefined,
+                    self_order_item_id: l.self_order_item_id || undefined,
                 })),
+                self_order_ids: [...new Set(this.cart.items.map((l) => l.self_order_id).filter(Boolean))],
                 customer_order_id: this.cart.customerOrder?.id ?? null,
                 order_type: this.config.orderType?.enabled ? this.cart.orderType : null,
                 table_label: this.config.orderType?.enabled && this.cart.orderType === 'dine_in' ? this.cart.table || null : null,
@@ -1426,6 +1536,7 @@ function posCashier(config) {
                 this.cart = this.newCart();
                 this.cartOpen = false;
                 this.$wire.$refresh();
+                this.refreshSelfOrders(true);
                 if (this.config.autoPrint && !window.matchMedia('(pointer: coarse)').matches) {
                     this.printReceipt();
                 }
@@ -1462,7 +1573,7 @@ function posCashier(config) {
         applyRejection(reason, context) {
             if (reason === 'price_changed') {
                 Object.entries(context.prices || {}).forEach(([id, info]) => {
-                    this.cart.items.filter((l) => l.product_id === Number(id) && !l.unit_id).forEach((l) => {
+                    this.cart.items.filter((l) => l.product_id === Number(id) && !l.unit_id && !l.self_order_item_id).forEach((l) => {
                         l.price = info.base_price ?? info.price;
                         l.tiers = info.tiers ?? l.tiers;
                     });
@@ -1489,6 +1600,15 @@ function posCashier(config) {
                 this.config.nearExpiryPercent = Object.values(context.near_expiry || {})[0]?.percent ?? this.config.nearExpiryPercent;
                 this.pay.lines = [];
                 this.pay.amount = '';
+            } else if (reason === 'self_order_invalid') {
+                const ids = (context.self_order_item_ids || []).map(Number);
+                this.cart.items = this.cart.items.filter((l) => !l.self_order_item_id || (ids.length && !ids.includes(l.self_order_item_id)));
+                this.pay.lines = [];
+                this.pay.amount = '';
+                this.refreshSelfOrders(true);
+                if (!this.cart.items.length) {
+                    closeModal('pos-payment');
+                }
             } else if (reason === 'order_closed') {
                 this.cart.customerOrder = null;
             } else if (reason === 'modifier_unavailable') {

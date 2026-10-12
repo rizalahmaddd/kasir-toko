@@ -62,6 +62,14 @@ Semua animasi fungsional dan punya kondisi berhenti. Transisi modal dan progress
 
 Default gelap, dengan toggle terang/gelap (`<x-theme-toggle>`, disimpan di cookie + localStorage). Dokumen cetak (`x-layouts.print`) selalu putih/terang karena dibaca sebagai hasil cetak.
 
+## Halaman Pelanggan (Pesanan QR)
+
+Pengecualian dari "alat kerja back-office": `resources/views/self-order/*` dibuka pelanggan di HP-nya sendiri, sering di luar ruangan. Aturannya:
+- Selalu tema terang (`<html class="light">`), satu kolom, lebar maksimal `max-w-2xl`; tidak ada sidebar, toggle tema, atau komponen modal aplikasi. Pindah tampilan (menu, pilihan, keranjang) mengganti isi halaman, bukan overlay.
+- Teks isian minimal `text-base` (16px) supaya iOS tidak memperbesar halaman saat fokus; semua target ketuk minimal 44px.
+- Satu aksi utama per tampilan, menempel di bawah dengan `env(safe-area-inset-bottom)`.
+- Ikon ditulis sebagai SVG inline; bundel `resources/js/self-order.js` sengaja tidak memuat `icons.js`.
+
 ## Standar Komponen Blade UI
 
 Wajib memakai komponen di `resources/views/components/`:

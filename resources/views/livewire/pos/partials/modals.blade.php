@@ -325,6 +325,125 @@
     </div>
 </x-modal>
 
+{{-- Kotak masuk pesanan QR --}}
+<x-modal name="pos-self-orders" max-width="2xl">
+    <div class="p-5 sm:p-6 space-y-4">
+        <div class="flex items-center justify-between gap-3 border-b border-slate-700/80 pb-3">
+            <div class="flex items-center gap-2.5">
+                <span class="p-2 rounded-xl bg-slate-800 text-emerald-600 dark:text-emerald-400 border border-slate-700">
+                    <i data-lucide="qr-code" class="w-5 h-5"></i>
+                </span>
+                <div>
+                    <h3 class="text-base font-black text-slate-100 tracking-tight">Pesanan Masuk QR</h3>
+                    <p class="text-xs text-slate-400">Pesanan mandiri dari QR meja atau kasir outlet ini</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <span x-show="selfOrders.length > 0" class="px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs font-black" x-text="selfOrders.length + ' Pesanan'"></span>
+                <button type="button" @click="$dispatch('close')" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+
+        <p x-show="selfOrdersLoading" class="text-xs font-semibold text-slate-400 py-4 text-center">Memuat antrean pesanan…</p>
+
+        <template x-if="!selfOrdersLoading && !selfOrders.length">
+            <x-empty-state icon="qr-code" title="Belum ada pesanan QR aktif" description="Pesanan baru dari pelanggan akan muncul di sini secara otomatis." />
+        </template>
+
+        <ul class="space-y-3.5 max-h-[65vh] overflow-y-auto custom-scrollbar" x-show="selfOrders.length">
+            <template x-for="order in selfOrders" :key="order.id">
+                <li class="rounded-2xl border border-slate-700/80 bg-slate-800/40 p-4 space-y-3.5 shadow-sm hover:border-slate-600 transition">
+                    {{-- Order Header --}}
+                    <div class="flex items-start justify-between gap-3 border-b border-slate-700/80 pb-3">
+                        <div class="min-w-0 space-y-1">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="px-2.5 py-0.5 rounded-lg text-xs font-black uppercase tracking-wider"
+                                    :class="order.label.startsWith('Meja') ? 'bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30' : 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30'"
+                                    x-text="order.label"></span>
+                                <span class="text-sm font-black text-slate-100 truncate" x-text="order.customer"></span>
+                            </div>
+                            <p class="text-[11px] text-slate-400" x-text="`${order.number} · ${order.created}${order.phone ? ' · WA: ' + order.phone : ''}`"></p>
+                        </div>
+                        <div class="text-right shrink-0">
+                            <p class="text-base font-black text-emerald-600 dark:text-emerald-400 tabular-nums" x-text="rupiah(order.total)"></p>
+                        </div>
+                    </div>
+
+                    {{-- Badges Status --}}
+                    <div class="flex flex-wrap gap-1.5">
+                        <span class="px-2 py-0.5 rounded-md border text-[10px] font-black uppercase tracking-wide"
+                            :class="{ 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30': order.status === 'pending', 'bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30': order.status === 'in_kitchen', 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30': order.status === 'ready' }"
+                            x-text="order.status_label"></span>
+                        <span class="px-2 py-0.5 rounded-md border text-[10px] font-black uppercase tracking-wide"
+                            :class="order.payment_status === 'rejected' ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30' : (order.payment_status === 'pending_verification' ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30' : (order.payment_status === 'paid' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30' : 'bg-slate-800 text-slate-300 border-slate-700'))"
+                            x-text="(order.payment_method === 'qris' ? 'QRIS · ' : 'Kasir · ') + order.payment_label"></span>
+                    </div>
+
+                    {{-- Items Ordered --}}
+                    <div class="rounded-xl bg-slate-900 border border-slate-700/80 p-3 space-y-1 text-xs">
+                        <template x-for="(item, index) in order.items" :key="index">
+                            <div class="flex justify-between gap-2 text-slate-300">
+                                <div>
+                                    <span class="font-bold text-slate-100" x-text="`${quantity(item.quantity)}× ${item.name}`"></span>
+                                    <span x-show="item.modifiers" class="text-slate-400 text-[11px]" x-text="` (${item.modifiers})`"></span>
+                                    <span x-show="item.note" class="text-amber-700 dark:text-amber-400 text-[11px] italic" x-text="` · Catatan: ${item.note}`"></span>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <p x-show="order.notes" class="text-xs text-amber-800 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 p-2.5 rounded-xl font-medium" x-text="`Catatan Tambahan: ${order.notes}`"></p>
+
+                    <p x-show="order.action === 'verify'" class="text-xs text-amber-800 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 p-2.5 rounded-xl font-semibold">
+                        ⚡ <strong>Periksa Mutasi QRIS:</strong> Pastikan dana masuk sebesar <span class="font-black text-slate-100 underline decoration-amber-500/50" x-text="rupiah(order.total)"></span> sebelum verifikasi lunas.
+                    </p>
+
+                    <p x-show="order.held_order_id" class="text-xs text-slate-400">
+                        Sudah tercatat di open bill <span class="font-bold text-slate-100" x-text="order.label"></span>. Saat pelanggan ingin bayar, buka tagihannya lalu selesaikan pembayaran.
+                    </p>
+
+                    {{-- Cancel Confirmation Box --}}
+                    <template x-if="selfOrderCancel === order.id">
+                        <div class="rounded-xl border border-rose-500/30 bg-rose-500/15 p-3.5 space-y-2.5">
+                            <p class="text-xs text-rose-700 dark:text-rose-300 font-semibold">Batalkan pesanan ini? Tiket dapur yang belum selesai akan ditarik dan pelanggan menerima notifikasi pembatalan.</p>
+                            <div class="flex flex-wrap gap-2">
+                                <x-secondary-button size="sm" type="button" @click="selfOrderCancel = null">Tidak Jadi</x-secondary-button>
+                                <x-danger-button size="sm" type="button" @click="selfOrderAct(order, 'cancel')" x-bind:disabled="selfOrderBusy !== null">Ya, Batalkan Pesanan</x-danger-button>
+                            </div>
+                        </div>
+                    </template>
+
+                    {{-- Action Buttons --}}
+                    <div class="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-700/80" x-show="selfOrderCancel !== order.id">
+                        <x-primary-button size="sm" type="button" x-show="order.action === 'accept'" @click="selfOrderAct(order, 'accept')" x-bind:disabled="selfOrderBusy !== null">
+                            <i data-lucide="check" class="w-3.5 h-3.5 mr-1"></i> Terima ke Open Bill
+                        </x-primary-button>
+                        <x-primary-button size="sm" type="button" x-show="order.action === 'pay'" @click="processSelfOrder(order)" x-bind:disabled="selfOrderBusy !== null">
+                            <i data-lucide="credit-card" class="w-3.5 h-3.5 mr-1"></i> Proses Bayar
+                        </x-primary-button>
+                        <x-primary-button size="sm" type="button" x-show="order.action === 'verify'" @click="selfOrderAct(order, 'verify')" x-bind:disabled="selfOrderBusy !== null">
+                            <i data-lucide="check-check" class="w-3.5 h-3.5 mr-1"></i> Verifikasi Lunas
+                        </x-primary-button>
+                        <x-secondary-button size="sm" type="button" x-show="order.action === 'verify'" @click="selfOrderAct(order, 'reject_payment')" x-bind:disabled="selfOrderBusy !== null">
+                            Uang Tidak Masuk
+                        </x-secondary-button>
+                        <x-primary-button size="sm" type="button" x-show="order.action === 'decide'" @click="selfOrderAct(order, 'bill')" x-bind:disabled="selfOrderBusy !== null">
+                            Tagih di Kasir
+                        </x-primary-button>
+                        <x-secondary-button size="sm" type="button" x-show="order.held_order_id" @click="openSelfOrderBill(order)" x-bind:disabled="selfOrderBusy !== null">
+                            Buka Tagihan
+                        </x-secondary-button>
+                        <x-primary-button size="sm" type="button" x-show="order.status === 'ready'" @click="selfOrderAct(order, 'served')" x-bind:disabled="selfOrderBusy !== null" x-text="order.label.startsWith('Meja') ? 'Sudah Diantar' : 'Sudah Diambil'"></x-primary-button>
+                        <x-text-button tone="rose" size="sm" x-show="order.payment_status !== 'paid'" @click="selfOrderCancel = order.id" x-text="order.status === 'pending' ? 'Tolak' : 'Batalkan'"></x-text-button>
+                    </div>
+                </li>
+            </template>
+        </ul>
+    </div>
+</x-modal>
+
 {{-- Kosongkan keranjang --}}
 <x-modal name="pos-clear" max-width="sm">
     <div class="p-5 sm:p-6 space-y-5">

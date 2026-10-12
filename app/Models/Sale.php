@@ -164,6 +164,7 @@ class Sale extends Model
 
     public const FLAG_LABELS = [
         'prescription_unverified' => 'Resep belum diverifikasi',
+        'self_order_price_snapshot' => 'Harga pesanan QR dikunci saat dipesan (katalog sudah berubah)',
         'controlled_drug_sold' => 'Obat narkotika/psikotropika terjual',
         'expired_batch_sold' => 'Batch kedaluwarsa terjual',
         'outlet_locked_sync' => 'Disinkron saat outlet terkunci',

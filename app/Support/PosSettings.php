@@ -34,6 +34,10 @@ class PosSettings
         'pos.near_expiry_discount_percent' => '0',
         'pos.near_expiry_discount_days' => '2',
         'pos.service_charge_dine_in_only' => '1',
+        'pos.self_order_enabled' => '0',
+        'pos.self_order_kitchen_flow' => 'confirm',
+        'pos.self_order_dine_in_payment' => 'after',
+        'pos.self_order_expire_minutes' => '15',
     ];
 
     public const PRESCRIPTION_MODES = [
@@ -188,6 +192,35 @@ class PosSettings
     public static function nearExpiryDiscountDays(): int
     {
         return max(0, min(60, (int) self::get('pos.near_expiry_discount_days')));
+    }
+
+    /**
+     * Sakelar buka/tutup pemesanan QR. Pemesanan baru benar-benar terbuka bila ada shift kasir yang berjalan.
+     */
+    public static function selfOrderEnabled(): bool
+    {
+        return self::get('pos.self_order_enabled') === '1';
+    }
+
+    /**
+     * `confirm`: kasir menerima pesanan dulu sebelum masuk dapur. `auto`: langsung ke dapur.
+     */
+    public static function selfOrderKitchenFlow(): string
+    {
+        return self::get('pos.self_order_kitchen_flow') === 'auto' ? 'auto' : 'confirm';
+    }
+
+    /**
+     * Kapan pesanan makan di tempat dibayar: `after` (setelah makan, lewat open bill) atau `before`.
+     */
+    public static function selfOrderDineInPayment(): string
+    {
+        return self::get('pos.self_order_dine_in_payment') === 'before' ? 'before' : 'after';
+    }
+
+    public static function selfOrderExpireMinutes(): int
+    {
+        return max(1, min(240, (int) self::get('pos.self_order_expire_minutes')));
     }
 
     /**

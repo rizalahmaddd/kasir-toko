@@ -15,7 +15,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 class KitchenTicketResource extends JsonResource
 {
     /**
-     * @return array{id: int, label: string, order_type: string|null, order_type_label: string|null, status: string, items: list<array<string, mixed>>, sale_number: string|null, cashier: string|null, created_at: string, done_at: string|null}
+     * @return array{id: int, label: string, order_type: string|null, order_type_label: string|null, status: string, from_self_order: bool, items: list<array<string, mixed>>, sale_number: string|null, cashier: string|null, created_at: string, done_at: string|null}
      */
     public function toArray(Request $request): array
     {
@@ -25,6 +25,7 @@ class KitchenTicketResource extends JsonResource
             'order_type' => $this->order_type,
             'order_type_label' => OrderType::tryFrom((string) $this->order_type)?->label(),
             'status' => $this->status,
+            'from_self_order' => $this->self_order_id !== null,
             'items' => array_values($this->items ?? []),
             'sale_number' => $this->relationLoaded('sale') ? $this->sale?->number : null,
             'cashier' => $this->relationLoaded('user') ? $this->user?->name : null,

@@ -93,6 +93,7 @@
                         <div class="flex items-center gap-1.5 mt-0.5">
                             <span class="text-[11px] text-slate-400 tabular-nums" x-text="`${rupiah(linePrice(line) + (line.modifiers || []).reduce((s, m) => s + m.price, 0))} × ${quantity(line.quantity)} ${line.unit}`"></span>
                             <span x-show="lineTiered(line)" class="px-1.5 rounded bg-amber-500/10 text-amber-400 text-[10px] font-bold">GROSIR</span>
+                            <span x-show="line.self_order_item_id" class="px-1.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-bold" :title="'Dari pesanan ' + (line.self_order_label || 'QR') + ', harga terkunci'">QR</span>
                             <span x-show="autoDiscounts[line.key] > 0" class="px-1.5 rounded bg-amber-500/10 text-amber-400 text-[10px] font-bold" x-text="`ED -${rupiah(autoDiscounts[line.key])}`"></span>
                             <span x-show="line.discount > 0" class="px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-bold tabular-nums" x-text="`-${rupiah(Math.min(line.discount, lineGross(line)))}`"></span>
                         </div>

@@ -35,6 +35,13 @@
             <div class="flex items-center gap-1 shrink-0">
                 <span x-show="!online" x-cloak class="hidden sm:inline-flex"><x-badge color="amber">OFFLINE</x-badge></span>
 
+                <button type="button" x-show="config.selfOrder.enabled" x-cloak @click="openSelfOrders()" title="Pesanan dari QR pelanggan"
+                    class="relative inline-flex items-center gap-2 h-11 px-2.5 sm:px-3 rounded-lg text-slate-300 hover:text-slate-100 hover:bg-slate-800 text-xs font-semibold">
+                    <i data-lucide="qr-code" class="w-5 h-5"></i>
+                    <span class="hidden lg:inline">Pesanan QR</span>
+                    <span x-show="selfOrderCount > 0" class="absolute top-1 right-1 lg:static min-w-[18px] h-[18px] px-1 rounded-full bg-emerald-500 text-slate-950 text-[10px] font-bold flex items-center justify-center" x-text="selfOrderCount"></span>
+                </button>
+
                 <button type="button" @click="openHeld()" title="Transaksi tertunda"
                     class="relative inline-flex items-center gap-2 h-11 px-2.5 sm:px-3 rounded-lg text-slate-300 hover:text-slate-100 hover:bg-slate-800 text-xs font-semibold">
                     <i data-lucide="clock" class="w-5 h-5"></i>

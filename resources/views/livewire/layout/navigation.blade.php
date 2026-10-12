@@ -42,7 +42,7 @@ new class extends Component {
                 this.flyoutGroup = null;
             } else {
                 const rect = trigger.getBoundingClientRect();
-                const estimatedHeight = 280;
+                const estimatedHeight = 60 + Number(trigger.dataset.links) * 34;
                 const maxTop = Math.max(8, window.innerHeight - estimatedHeight - 16);
                 this.flyoutTop = Math.max(8, Math.min(rect.top, maxTop));
                 this.flyoutGroup = name;
@@ -132,7 +132,7 @@ new class extends Component {
                         @foreach ($section['items'] as $item)
                             @if (isset($item['children']))
                                 <div>
-                                    <button type="button" @click.stop="toggleGroup('{{ $item['key'] }}', $el)"
+                                    <button type="button" data-links="{{ count($item['children']) }}" @click.stop="toggleGroup('{{ $item['key'] }}', $el)"
                                         :title="collapsed ? @js($item['label']) : ''"
                                         class="w-full flex items-center justify-between gap-2 min-h-[44px] md:min-h-[36px] px-2.5 py-2 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 focus:outline-none transition"
                                         :class="activeGroup === '{{ $item['key'] }}' || (collapsed && flyoutGroup === '{{ $item['key'] }}') ? 'text-slate-200 bg-slate-800/40' : ''">
@@ -220,24 +220,18 @@ new class extends Component {
             </div>
         @endif
 
-        {{-- Tombol Unduh Aplikasi Android --}}
-        <div class="sidebar-download shrink-0 px-3 py-1.5 border-t border-slate-800/80 [.sidebar-collapsed_&]:px-2.5">
+        {{-- Di desktop tombol unduh ada di bar atas (layouts/app); drawer mobile tidak punya bar itu. --}}
+        <div class="md:hidden shrink-0 px-3 py-1.5 border-t border-slate-800/80">
             <a href="{{ route('app.download') }}" target="_blank"
-                class="block rounded-xl border border-slate-800/80 bg-slate-950/40 p-2 [.sidebar-collapsed_&]:p-2 transition hover:border-slate-700/80 hover:bg-slate-950/70 group"
-                :title="collapsed ? 'Unduh Aplikasi Android APK' : ''">
-                <div x-show="!collapsed" data-rail-hidden class="flex items-center gap-2.5 min-w-0">
-                    <div class="w-6 h-6 rounded-md bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0">
-                        <i data-lucide="smartphone" class="w-3.5 h-3.5"></i>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <div class="text-[11px] font-bold text-slate-200 truncate leading-tight">Unduh Aplikasi</div>
-                        <div class="text-[9px] text-slate-400 truncate">Android APK</div>
-                    </div>
-                    <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-300 transition shrink-0"></i>
+                class="flex items-center gap-2.5 min-w-0 min-h-[44px] rounded-xl border border-slate-800/80 bg-slate-950/40 px-2 transition hover:border-slate-700/80 hover:bg-slate-950/70 group">
+                <div class="w-6 h-6 rounded-md bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0">
+                    <i data-lucide="smartphone" class="w-3.5 h-3.5"></i>
                 </div>
-                <div x-show="collapsed" class="flex items-center justify-center py-0.5">
-                    <i data-lucide="smartphone" class="w-4 h-4 text-emerald-400"></i>
+                <div class="flex-1 min-w-0">
+                    <div class="text-[11px] font-bold text-slate-200 truncate leading-tight">Unduh Aplikasi</div>
+                    <div class="text-[9px] text-slate-400 truncate">Android APK</div>
                 </div>
+                <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-300 transition shrink-0"></i>
             </a>
         </div>
 

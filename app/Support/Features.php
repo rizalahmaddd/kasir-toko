@@ -160,6 +160,11 @@ class Features
                     'description' => 'Makan di tempat, bawa pulang, atau antar; nomor meja & antrean, open bill per meja, dan tiket dapur.',
                     'routes' => ['kitchen.*', 'print.kitchen-ticket'],
                 ],
+                'self-order' => [
+                    'label' => 'Pesan Lewat QR (Self-Order)',
+                    'description' => 'Pelanggan memindai QR di meja atau kasir lalu memesan dari HP-nya; pesanan masuk ke kasir dan dapur. Butuh Tipe Pesanan & Meja dan paket Pro.',
+                    'routes' => ['settings.tables*', 'print.table-*', 'print.self-order-standee', 'self-order.*'],
+                ],
                 'tiered-price' => [
                     'label' => 'Harga Grosir',
                     'description' => 'Harga satuan turun otomatis saat jumlah beli mencapai batas tertentu.',
@@ -250,6 +255,16 @@ class Features
         ],
     ];
 
+    /**
+     * Fitur yang hanya berjalan di outlet bila fitur lain ikut menyala di outlet itu. Hanya dibaca
+     * enabledAt(): halaman pengaturannya (enabled()) tetap terbuka supaya bisa disiapkan lebih dulu.
+     *
+     * @var array<string, list<string>>
+     */
+    public const REQUIRES = [
+        'business.self-order' => ['business.order-type'],
+    ];
+
     /** @var array<string, list<string>> */
     private static array $urlCache = [];
 
@@ -289,8 +304,11 @@ class Features
      */
     public static function enabledAt(string $key, ?int $outletId = null): bool
     {
+        $outletId ??= app(CurrentOutlet::class)->idOrPrimary();
+
         return self::enabled($key)
-            && OutletFeatures::allows($key, $outletId ?? app(CurrentOutlet::class)->idOrPrimary());
+            && OutletFeatures::allows($key, $outletId)
+            && array_all(self::REQUIRES[$key] ?? [], fn (string $required) => self::enabledAt($required, $outletId));
     }
 
     /**

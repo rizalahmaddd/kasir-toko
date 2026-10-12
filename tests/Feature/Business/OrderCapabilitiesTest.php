@@ -299,3 +299,14 @@ test('the kitchen API lists pending tickets for the outlet and marks them done',
     $this->getJson('/api/v1/pos/kitchen-tickets?status=done')->assertOk()->assertJsonPath('data.0.id', $ticket->id);
     $this->getJson("/api/v1/sales/{$sale->id}")->assertOk()->assertJsonPath('data.kitchen_tickets.0.order_type', 'take_away');
 });
+
+test('the kitchen board exposes the pending count the page watches for its new-ticket sound', function () {
+    orderSale($this->cashier, [['product_id' => $this->latte->id, 'quantity' => 1, 'price' => 28000, 'modifiers' => [['id' => $this->regular->id, 'price' => 0]]]], ['order_type' => 'take_away']);
+
+    $board = Livewire::test(KitchenBoard::class)->assertSet('pendingCount', 1)->assertSee('Menunggu (1)');
+
+    // `$wire.pendingCount` di halaman harus terbaca sebagai properti; kalau bukan, Alpine memanggilnya sebagai method.
+    expect(array_key_exists('pendingCount', $board->snapshot['data']))->toBeTrue();
+
+    $board->call('markDone', KitchenTicket::query()->sole()->id)->assertSet('pendingCount', 0);
+});

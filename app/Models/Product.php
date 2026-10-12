@@ -297,6 +297,18 @@ class Product extends Model
     }
 
     /**
+     * Yang boleh dipesan pelanggan sendiri dari QR: obat wajib resep butuh apoteker, dan barang bernomor
+     * seri butuh kasir memilih unitnya.
+     *
+     * @param  Builder<Product>  $query
+     */
+    public function scopeOrderableByGuests(Builder $query): void
+    {
+        $query->where('products.requires_prescription', false)
+            ->where(fn (Builder $query) => $query->where('products.track_serial', false)->orWhere('products.track_stock', false));
+    }
+
+    /**
      * Muat stok, stok minimum, dan harga outlet ke model yang sudah ada (mis. hasil route binding),
      * supaya outletStock() dan effectivePrice() tidak jatuh ke nilai total/bawaan.
      */

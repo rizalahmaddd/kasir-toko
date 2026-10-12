@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\Pos\CashierController;
 use App\Http\Controllers\Api\V1\Pos\CurrentShiftController;
 use App\Http\Controllers\Api\V1\Pos\HeldOrderController;
 use App\Http\Controllers\Api\V1\Pos\KitchenTicketController;
+use App\Http\Controllers\Api\V1\Pos\SelfOrderController;
 use App\Http\Controllers\Api\V1\PrintController;
 use App\Http\Controllers\Api\V1\Sales\ReceivableController;
 use App\Http\Controllers\Api\V1\Sales\SaleController;
@@ -59,6 +60,16 @@ Route::prefix('pos/kitchen-tickets')->name('pos.kitchen-tickets.')->middleware('
     Route::get('{ticket}', [KitchenTicketController::class, 'show'])->name('show');
     Route::post('{ticket}/done', [KitchenTicketController::class, 'done'])->name('done');
     Route::post('{ticket}/reopen', [KitchenTicketController::class, 'reopen'])->name('reopen');
+});
+
+Route::prefix('pos/self-orders')->name('pos.self-orders.')->middleware(['can:pos.sell', 'feature:business.self-order', 'pro'])->group(function () {
+    Route::get('/', [SelfOrderController::class, 'index'])->name('index');
+    Route::post('{selfOrder}/accept', [SelfOrderController::class, 'accept'])->name('accept');
+    Route::get('{selfOrder}/cart', [SelfOrderController::class, 'cart'])->name('cart');
+    Route::post('{selfOrder}/verify-payment', [SelfOrderController::class, 'verifyPayment'])->name('verify-payment');
+    Route::post('{selfOrder}/reject', [SelfOrderController::class, 'reject'])->name('reject');
+    Route::post('{selfOrder}/bill-at-cashier', [SelfOrderController::class, 'billAtCashier'])->name('bill-at-cashier');
+    Route::post('{selfOrder}/served', [SelfOrderController::class, 'served'])->name('served');
 });
 
 Route::prefix('receivables')->name('receivables.')->middleware(['can:receivables.manage', 'feature:pos.receivables', 'pro'])->group(function () {
